@@ -1,0 +1,7 @@
+site/dist
+site/node_modules
+knowledge
+docs
+.claude
+README.md
+CLAUDE.md

@@ -1,0 +1,20 @@
+# fly.io app for Shaked's workout site. Static page served by Caddy behind
+# basic auth. Scales to zero when idle (it's a personal page, not a service).
+#
+# One-time: flyctl apps create shaked-workout
+# Secrets:  flyctl secrets set SITE_USER=... SITE_PASSWORD_HASH=... --config site/fly.toml
+app = "shaked-workout"
+primary_region = "iad"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

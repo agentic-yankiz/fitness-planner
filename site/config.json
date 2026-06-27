@@ -1,0 +1,7 @@
+{
+  "title": "Shaked's Workout Plan",
+  "waveWeeks": 4,
+  "deloadWeek": 5,
+  "currentWeek": { "block": 1, "week": 1 },
+  "showMetrics": true
+}

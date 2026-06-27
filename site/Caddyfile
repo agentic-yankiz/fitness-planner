@@ -1,0 +1,23 @@
+# Serve the static plan on :8080, gated by HTTP basic auth so the site is
+# private (only someone with the username + password can see it).
+#
+# SITE_USER and SITE_PASSWORD_HASH are injected at runtime via fly secrets:
+#   HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'your-password')
+#   flyctl secrets set SITE_USER=shaked SITE_PASSWORD_HASH="$HASH" --config site/fly.toml
+# The hash is bcrypt; only the hash is stored, never the plaintext password.
+
+:8080 {
+	root * /srv
+	encode gzip
+	file_server
+
+	basic_auth {
+		{$SITE_USER} {$SITE_PASSWORD_HASH}
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+}

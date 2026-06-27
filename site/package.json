@@ -1,0 +1,13 @@
+{
+  "name": "workout-program-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Static-site generator for Shaked's workout plan (light, private, auto-deployed).",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  }
+}

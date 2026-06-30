@@ -21,7 +21,7 @@ Open **[`PLAN.md`](PLAN.md)** — that's the clean, printable weekly plan with t
 | [`knowledge/fat-loss-nutrition.md`](knowledge/fat-loss-nutrition.md) | Diet-led fat loss, no cardio. |
 | [`knowledge/exercise-library.md`](knowledge/exercise-library.md) | Every exercise + learning video in one table. |
 | [`tracking/`](tracking/) | Weekly log template — fill it in; next cycle starts from real numbers. |
-| [`site/`](site/) | The web version of the plan — light UI, current-week + progress, private on fly.io (deploy currently manual; auto-deploy on push is suspended). |
+| [`site/`](site/) | The web version of the plan — light UI, current-week + progress, served locally through Tailscale at `/fitness/`. |
 | [`.claude/`](.claude/) | Helper **agents** and **skills** for future AI sessions (see below). |
 | [`docs/`](docs/) | Backlog specs for future agents (e.g. the training feedback-loop task). |
 

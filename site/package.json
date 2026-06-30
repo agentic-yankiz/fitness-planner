@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Static-site generator for Shaked's workout plan (light, private, auto-deployed).",
+  "description": "Static-site generator for Shaked's workout plan (light, local, Tailscale-served).",
   "scripts": {
     "build": "node build.mjs",
-    "dev": "BASE_PATH=/fitness node build.mjs && SITE_DIST=$(pwd)/dist caddy run --config Caddyfile.dev --adapter caddyfile"
+    "dev": "BASE_PATH=/fitness node build.mjs && SITE_DIST=$(pwd)/dist caddy run --config Caddyfile --adapter caddyfile",
+    "install:launchd": "./bin/install-local-launchd.sh"
   },
   "dependencies": {
     "markdown-it": "^14.1.0"

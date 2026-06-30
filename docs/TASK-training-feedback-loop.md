@@ -8,9 +8,8 @@
 ## Current direction (2026-06-15)
 Shaked redirected this loop away from GitHub Actions:
 - **No GitHub-Actions automation for now** — the feedback-loop automation below is not being
-  built, and the site workflow's **push auto-deploy is suspended**. (The site deploy itself
-  still works as a **manual, main-guarded `workflow_dispatch`** — that production deploy is
-  *not* disabled, only its automatic push trigger.)
+  built. The site is also local-only now: a launchd service on the laptop pulls `main`,
+  rebuilds, and serves through Tailscale; GitHub Actions only validates lint/build.
 - **The loop runs through the Claude session**, using the existing `.claude/` agents and
   skills (`log-workout`, `advance-week`, `progress-tracker`, `workout-coach`). Shaked
   communicates logs/feedback in-session; Claude parses, updates `tracking/`, and proposes

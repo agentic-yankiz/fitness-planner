@@ -197,14 +197,14 @@ function progressHtml(cfg, cur) {
     <thead><tr><th>Metric</th><th>Latest</th><th>Δ since start</th><th>Trend</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <p class="empty">Rising shoulder pain is never a win — see <a href="https://github.com/Shaked/monorepo/blob/main/workout-program/knowledge/shoulder-physio.md">shoulder-physio</a>.</p>
+  <p class="empty">Rising shoulder pain is never a win — see <a href="https://github.com/agentic-yankiz/fitness-planner/blob/main/knowledge/shoulder-physio.md">shoulder-physio</a>.</p>
 </section>`;
 }
 
 // ---------- page ----------
 function page({ cfg, cur, planHtml, hero, progress, version, builtAt, basePath }) {
   const shaUrl = version.sha !== 'dev'
-    ? `https://github.com/Shaked/monorepo/commit/${version.full}`
+    ? `https://github.com/agentic-yankiz/fitness-planner/commit/${version.full}`
     : null;
   const stamp = shaUrl
     ? `<a href="${shaUrl}">v ${esc(version.sha)}</a> · deployed ${esc(builtAt)}`

@@ -1,94 +1,78 @@
-# Workout site — private, light (deploy currently manual)
+# Workout Site - Local Tailscale Serve
 
-A tiny static site that renders [`../PLAN.md`](../PLAN.md) (the source of truth) into a clean,
-**light** (no dark mode), junk-free web page you can open on your phone. It:
+A tiny static site that renders [`../PLAN.md`](../PLAN.md) into a clean, light page for
+the gym. It is read-only: if the site and `PLAN.md` disagree, `PLAN.md` wins.
 
-- shows the day-by-day plan,
-- **marks the current week** of the 4-week wave (a hero card + that week's scaled levers),
-- shows **progress** parsed from [`../tracking/`](../tracking/) (bodyweight, shoulder-pain, sparklines),
-- stamps every page with the **build commit + deploy time** (footer),
-- deploys to **fly.io behind HTTP basic auth** (private), and **pings Telegram** with the version + URL on success.
+The canonical deploy is local-only:
 
-It is read-only — it never writes back. If the site and `PLAN.md` disagree, `PLAN.md` wins.
-
-> **Deploy is currently manual-only.** Auto-deploy on push is **suspended** — the workflow
-> runs only via `workflow_dispatch`. See the header of
-> [`../../.github/workflows/workout-program-site.yml`](../../.github/workflows/workout-program-site.yml)
-> to re-enable the push trigger.
-
-## How it works
-
-```
-manual run (workflow_dispatch)  →  GitHub Actions  →  flyctl deploy (remote build)  →  fly.io (Caddy + basic auth)
-                                      │                                                    │
-                                      └── build.mjs reads PLAN.md + tracking/      Telegram ping (version + URL)
-                                          → dist/index.html (+ styles.css)
+```text
+main changes on GitHub -> launchd service fetches origin/main -> fast-forward merge
+  -> npm build -> Caddy serves ./dist on localhost:8080/fitness/
+  -> Tailscale Serve exposes https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/
 ```
 
-- `build.mjs` — the generator (Node + `markdown-it`, no framework).
-- `styles.css` — the light theme (print- and mobile-friendly).
-- `config.json` — title, wave length, and the **first-run** `currentWeek` fallback.
-- `Dockerfile` / `Caddyfile` / `fly.toml` — build-and-serve, with basic-auth gating.
-- `../../.github/workflows/workout-program-site.yml` — the deploy + notify workflow (push
-  trigger currently suspended; manual `workflow_dispatch` only).
+No Fly.io, GitHub Pages, or other hosted deployment is used.
 
-### Current week
-Derived from the **newest** `../tracking/week-YYYY-MM-DD.md` (its first line declares
-`Block N / Week M`). With no logs yet, it falls back to `config.json` → `currentWeek`.
+## What It Shows
 
-## Run it locally
+- day-by-day plan tables from `PLAN.md`
+- current block/week from the newest `../tracking/week-YYYY-MM-DD.md`
+- progress parsed from `../tracking/`
+- footer stamp with the build commit and UTC build time
+
+## Manual Local Run
 
 ```bash
-cd workout-program/site
+cd site
 npm install
-npm run build        # writes ./dist
-# open dist/index.html in a browser
+npm run dev
 ```
 
-`GIT_SHA` and `BUILD_TIME` are read from the environment for the footer stamp; without them
-the footer shows `local build`.
+Then open:
 
-## Dev server (via Tailscale)
+- local: `http://localhost:8080/fitness/`
+- Tailscale, after serve is configured:
+  `https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/`
 
-Serve the site locally at `/fitness` path prefix (ready to access via Tailscale):
+## Always-On Setup
+
+Install the macOS LaunchAgent from the repo root:
 
 ```bash
-cd workout-program/site
-npm install
-npm run dev          # builds with /fitness base path, starts Caddy on :8080
+cd site
+npm run install:launchd
 ```
 
-Then access at:
-- **Local:** `http://localhost:8080/fitness`
-- **Via Tailscale:** `https://shakeds-macbook-pro-2.tail0b783.ts.net:8080/fitness` (or adjust the domain for your machine)
+The service:
 
-The dev server has **no auth** and is meant for local testing only. Production deploys to
-fly.io use a separate `Caddyfile` with basic auth and are triggered manually via GitHub Actions.
+- starts on login and restarts if it exits
+- builds the site immediately
+- configures Tailscale Serve for `/fitness`
+- checks `origin/main` every 60 seconds
+- fast-forwards only when the local worktree is clean
+- rebuilds after every successful update
 
-## One-time deploy setup (fly.io)
+Logs live in `~/Library/Logs/fitness-planner/`.
+
+Useful commands:
 
 ```bash
-# from workout-program/
-flyctl apps create shaked-workout                       # or edit the name in fly.toml
-
-# set the basic-auth credentials (private gate). Generate a bcrypt hash:
-HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'YOUR-PASSWORD')
-flyctl secrets set SITE_USER=shaked SITE_PASSWORD_HASH="$HASH" --config site/fly.toml
+launchctl print gui/$(id -u)/com.shaked.fitness-planner.site
+tail -f ~/Library/Logs/fitness-planner/site-launchd.log
+tail -f ~/Library/Logs/fitness-planner/site-launchd.err.log
 ```
 
-Then add these **repo secrets** in `Shaked/monorepo` → Settings → Secrets and variables → Actions:
+## Requirements
 
-| Secret | Purpose |
-|---|---|
-| `FLY_API_TOKEN` | Lets the workflow run `flyctl deploy` (`flyctl tokens create deploy`). |
-| `TELEGRAM_BOT_TOKEN` | BotFather token — sends the "deployed" message. |
-| `TELEGRAM_CHAT_ID` | Your chat id — *which* chat to message (the token alone can't address it). |
+- macOS launchd
+- Node/npm
+- Caddy (`brew install caddy`)
+- Tailscale signed in on the laptop
 
-After that, a deploy (currently triggered manually via `workflow_dispatch` — auto-deploy on
-push is suspended) rebuilds, redeploys, and (if the Telegram secrets are set) pings you with
-the version + URL. The site lives at `https://shaked-workout.fly.dev/` behind the
-username/password you set.
+The script also finds the macOS Tailscale app CLI at
+`/Applications/Tailscale.app/Contents/MacOS/Tailscale` when `tailscale` is not on `PATH`.
 
-> Privacy: the page is gated by basic auth, so bodyweight / shoulder-pain / benchmarks stay
-> behind the password. Set `showMetrics: false` in `config.json` if you want to drop personal
-> numbers from the build entirely.
+## Current Week
+
+The build reads the newest `../tracking/week-YYYY-MM-DD.md` whose first line declares
+`Block N / Week M`. With no logs yet, it falls back to `config.json`.

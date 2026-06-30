@@ -30,13 +30,14 @@ plus a shoulder-physio block for a flagged left front-shoulder issue.
 - `docs/TASK-training-feedback-loop.md` — feedback loop. **GitHub-Actions automation parked
   (2026-06-15);** the loop now runs via the Claude session (agents + skills), with PRs
   created and adversarially reviewed by Claude agents. See the doc's *Current direction*.
-- `docs/TASK-github-pages-site.md` — **built** (in `site/`, on fly.io for privacy).
+- `docs/TASK-github-pages-site.md` — **superseded by local Tailscale serving** in `site/`.
 
 ## The web site (`site/`)
-Static render of `PLAN.md` (the source of truth). Deploys to **fly.io behind HTTP basic
-auth** (private), then pings Telegram. Build is `site/build.mjs`; workflow is
-`.github/workflows/workout-program-site.yml` (**auto-deploy on push is currently suspended —
-manual `workflow_dispatch` only**). Read-only — `PLAN.md` always wins.
+Static render of `PLAN.md` (the source of truth). It is served locally with Caddy at
+`/fitness/` and exposed through Tailscale. The launchd service in
+`site/bin/local-sync-serve.sh` fast-forwards to `origin/main`, rebuilds, and keeps the
+server running after login/restart. The GitHub workflow only validates lint/build; it does
+not deploy anywhere. Read-only — `PLAN.md` always wins.
 
 ## Rules for editing
 1. **`PLAN.md` stays human-readable** — tables, short lines, video links. Deep explanation

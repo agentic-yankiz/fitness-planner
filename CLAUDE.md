@@ -1,3 +1,5 @@
+> **Org rules:** read `CLAUDE.md` in `agentic-yankiz/agents-mgmt` — applies here unless explicitly overridden below.
+
 # CLAUDE.md — workout-program project
 
 Guidance for AI assistants working in this project. This is a **docs-only project**

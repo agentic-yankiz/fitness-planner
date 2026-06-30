@@ -48,6 +48,23 @@ npm run build        # writes ./dist
 `GIT_SHA` and `BUILD_TIME` are read from the environment for the footer stamp; without them
 the footer shows `local build`.
 
+## Dev server (via Tailscale)
+
+Serve the site locally at `/fitness` path prefix (ready to access via Tailscale):
+
+```bash
+cd workout-program/site
+npm install
+npm run dev          # builds with /fitness base path, starts Caddy on :8080
+```
+
+Then access at:
+- **Local:** `http://localhost:8080/fitness`
+- **Via Tailscale:** `https://shakeds-macbook-pro-2.tail0b783.ts.net:8080/fitness` (or adjust the domain for your machine)
+
+The dev server has **no auth** and is meant for local testing only. Production deploys to
+fly.io use a separate `Caddyfile` with basic auth and are triggered manually via GitHub Actions.
+
 ## One-time deploy setup (fly.io)
 
 ```bash

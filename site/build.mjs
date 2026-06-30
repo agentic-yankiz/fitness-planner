@@ -202,13 +202,14 @@ function progressHtml(cfg, cur) {
 }
 
 // ---------- page ----------
-function page({ cfg, cur, planHtml, hero, progress, version, builtAt }) {
+function page({ cfg, cur, planHtml, hero, progress, version, builtAt, basePath }) {
   const shaUrl = version.sha !== 'dev'
     ? `https://github.com/Shaked/monorepo/commit/${version.full}`
     : null;
   const stamp = shaUrl
     ? `<a href="${shaUrl}">v ${esc(version.sha)}</a> · deployed ${esc(builtAt)}`
     : `local build · ${esc(builtAt)}`;
+  const baseTag = basePath ? `<base href="${esc(basePath)}/">` : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -216,6 +217,7 @@ function page({ cfg, cur, planHtml, hero, progress, version, builtAt }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>${esc(cfg.title)}</title>
+${baseTag}
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -249,6 +251,7 @@ function build() {
   })();
   const builtAt = process.env.BUILD_TIME ||
     new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  const basePath = (process.env.BASE_PATH || '').replace(/\/+$/, '');
 
   const html = page({
     cfg,
@@ -258,6 +261,7 @@ function build() {
     progress: progressHtml(cfg, cur),
     version,
     builtAt,
+    basePath,
   });
 
   fs.rmSync(DIST, { recursive: true, force: true });

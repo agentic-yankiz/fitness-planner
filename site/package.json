@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Static-site generator for Shaked's workout plan (light, private, auto-deployed).",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "dev": "BASE_PATH=/fitness node build.mjs && SITE_DIST=$(pwd)/dist caddy run --config Caddyfile.dev --adapter caddyfile"
   },
   "dependencies": {
     "markdown-it": "^14.1.0"

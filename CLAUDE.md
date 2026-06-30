@@ -22,7 +22,8 @@ plus a shoulder-physio block for a flagged left front-shoulder issue.
 ## Helpers
 - **Agents** (`.claude/agents/`): `workout-coach`, `physio-advisor`, `progress-tracker`.
 - **Skills** (`.claude/skills/`): `show-weekly-plan`, `log-workout`, `advance-week`,
-  `pro-trainer` (evidence + logged-results coaching), `grill-me` (stress-test a plan/decision).
+  `pro-trainer` (evidence + logged-results coaching), `grill-me` (stress-test a plan/decision),
+  `kanban` (show GitHub issue backlog as a kanban board).
 - Run Claude from inside `workout-program/` so these are picked up.
 
 ## Backlog

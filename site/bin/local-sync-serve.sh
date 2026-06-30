@@ -57,7 +57,7 @@ fi
 install_dependencies() {
   if [ ! -d "$SITE/node_modules" ]; then
     log "installing site dependencies"
-    (cd "$SITE" && npm ci --no-audit --no-fund)
+    (cd "$SITE" && npm install --no-audit --no-fund)
   fi
 }
 
@@ -103,7 +103,7 @@ sync_main() {
   package_after="$(git -C "$ROOT" rev-parse HEAD:site/package-lock.json 2>/dev/null || true)"
   if [ "$package_before" != "$package_after" ] || [ ! -d "$SITE/node_modules" ]; then
     log "package lock changed; refreshing dependencies"
-    (cd "$SITE" && npm ci --no-audit --no-fund)
+    (cd "$SITE" && npm install --no-audit --no-fund)
   fi
 
   build_site

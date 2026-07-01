@@ -3,5 +3,7 @@
   "waveWeeks": 4,
   "deloadWeek": 5,
   "currentWeek": { "block": 1, "week": 1 },
-  "showMetrics": true
+  "showMetrics": true,
+  "trainingDays": [1, 2, 4, 5],
+  "trainingDayKeywords": { "1": "Mon", "2": "Tuesday", "4": "Thu", "5": "Friday" }
 }

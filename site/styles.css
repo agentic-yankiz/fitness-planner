@@ -95,6 +95,7 @@ main {
 /* --- rendered plan --- */
 .plan h1 { font-size: 1.5rem; margin: 32px 0 8px; }
 .plan h2 { font-size: 1.25rem; margin: 30px 0 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.plan h2.today { background: var(--accent-soft); border-left: 4px solid var(--accent); padding-left: 10px; border-radius: 0 6px 6px 0; margin-left: -14px; }
 .plan h3 { font-size: 1.05rem; margin: 22px 0 6px; }
 .plan a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
 .plan a:hover { border-bottom-color: var(--accent); }

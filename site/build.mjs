@@ -201,6 +201,28 @@ function progressHtml(cfg, cur) {
 </section>`;
 }
 
+// ---------- today-highlight script ----------
+function todayScript(cfg) {
+  const keywords = cfg.trainingDayKeywords || {};
+  if (!Object.keys(keywords).length) return '';
+  const map = JSON.stringify(keywords);
+  return `<script>
+(function(){try{
+  var map=${map};
+  var kw=map[new Date().getDay()];
+  if(!kw)return;
+  var hs=document.querySelectorAll('.plan h2');
+  for(var i=0;i<hs.length;i++){
+    if(hs[i].textContent.toLowerCase().indexOf(kw.toLowerCase())!==-1){
+      hs[i].classList.add('today');
+      if(window.innerWidth<640)hs[i].scrollIntoView({behavior:'smooth',block:'start'});
+      break;
+    }
+  }
+}catch(e){}})();
+</script>`;
+}
+
 // ---------- page ----------
 function page({ cfg, cur, planHtml, hero, progress, version, builtAt, basePath }) {
   const shaUrl = version.sha !== 'dev'
@@ -235,7 +257,7 @@ ${baseTag}
     <span class="src">source: <code>PLAN.md</code></span>
   </footer>
 </main>
-</body>
+${todayScript(cfg)}</body>
 </html>`;
 }
 

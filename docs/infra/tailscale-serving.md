@@ -46,6 +46,11 @@ Rules:
 - **Each project owns exactly one path prefix**, lowercase, matching the repo name.
 - Prefixes are exclusive — no project nests under another.
 - The root `/` must not be claimed by any project; it stays for a shared index.
+- **Backends bind loopback only.** Every project's local server (Caddy or otherwise)
+  binds `127.0.0.1:<port>`, never `:<port>` (all interfaces). Tailscale serve proxies
+  to `http://127.0.0.1:<port>`, so nothing else needs to reach the port. Binding all
+  interfaces would expose the backend to the LAN, bypassing Tailscale entirely — and
+  with it the identity headers the write-auth design depends on.
 
 ---
 
@@ -65,6 +70,9 @@ port for that project (pick a free port, e.g. 8081, 8082, …).
 The existing fitness Caddyfile demonstrates the pattern:
 
 ```caddy
+# Loopback-only bind — never `:<port>` (see path-convention rules)
+127.0.0.1:<port> {
+
 # Trailing-slash redirect
 handle /<project> {
     redir * /<project>/ 301
@@ -86,6 +94,8 @@ header {
     -Server
     X-Content-Type-Options nosniff
     Referrer-Policy no-referrer
+}
+
 }
 ```
 
@@ -135,8 +145,9 @@ tailscale funnel off
 | Threat | Outcome |
 |--------|---------|
 | Non-tailnet attacker (public internet) | Unreachable. Tailscale does not expose the serve port to the internet without Funnel. |
+| Same-LAN attacker (not on the tailnet) | Unreachable. The backend binds `127.0.0.1` only, so `laptop-lan-ip:<port>` refuses the connection — the only non-loopback path is the Tailscale proxy. |
 | Tailnet guest (another device on the tailnet) | Read-only access to GET routes. Write routes are protected by identity headers — see the write-auth design below. |
-| Local process on the laptop | Trusted. The machine is a single-user device; `localhost` bypass for automation is deliberate — see write-auth design. |
+| Local process on the laptop | Trusted. The machine is a single-user device; the loopback bypass for automation is deliberate — see write-auth design. |
 | Caddy stripping identity headers | Not a risk: the current Caddyfile `header {}` block only removes `Server` and sets two response headers; it does not touch request headers forwarded from Tailscale. |
 
 ### Identity-header topology
@@ -149,8 +160,16 @@ forwarding to the local backend:
 - `Tailscale-User-Profile-Pic` — profile image URL
 
 These headers are present on all requests that arrive via the Tailscale serve proxy.
-Requests that arrive directly at the Caddy port (`localhost:8080`) do **not** carry
-these headers.
+Requests that arrive directly at the Caddy port (`127.0.0.1:8080`) do **not** carry
+these headers — unless the local client sets them itself, which is why identity
+alone is never sufficient (see the trust-model caveat below).
+
+> **Trust-model caveat.** These identity headers are trustworthy **only** because the
+> sole non-loopback path to the backend is the Tailscale serve proxy, which sets (and
+> overwrites) them on every request it forwards. That in turn holds only because the
+> backend binds `127.0.0.1`. If the bind is ever widened (e.g. back to `:<port>`),
+> any LAN client could connect directly and send a forged `Tailscale-User-Login`
+> header, and the entire trust model collapses. Do not "fix" the loopback bind.
 
 ---
 
@@ -163,45 +182,79 @@ these headers.
 
 - **GET** routes: open to all tailnet members (read-only).
 - **POST / PATCH / DELETE** routes: restricted to `klein.shaked@gmail.com`.
-- **Localhost bypass**: requests arriving directly on `127.0.0.1:<port>` (no
-  `Tailscale-User-Login` header) are trusted as local automation (e.g., a future
-  Telegram bot). This bypass is acceptable because the laptop is a single-user machine;
-  no other processes are expected to POST to the fitness server.
+- **Loopback bypass**: requests whose **`remote_addr` is loopback** (`127.0.0.1` /
+  `::1`) **and** that carry **no** `Tailscale-User-Login` header are trusted as local
+  automation (e.g., a future Telegram bot). Both conditions are required — an absent
+  header alone is *not* proof of a local request. This bypass is acceptable because the
+  laptop is a single-user machine; no other processes are expected to POST to the
+  fitness server.
 
 ### Enforcement logic (pseudocode)
 
 ```
 if request.method in [POST, PATCH, DELETE, PUT]:
     user_login = request.headers.get("Tailscale-User-Login")
-    if user_login is None:
-        # No header → request came via localhost; allow (bot bypass)
-        pass
-    elif user_login != "klein.shaked@gmail.com":
-        return 403 Forbidden
+    if user_login == "klein.shaked@gmail.com":
+        pass  # authenticated tailnet owner (header set by the Tailscale proxy)
+    elif user_login is None and is_loopback(request.remote_addr):
+        pass  # local automation bypass: loopback source AND no identity header
+    else:
+        return 403 Forbidden  # wrong identity, or non-loopback without trusted header
 ```
+
+Note: a missing header alone never grants access — the bypass requires the loopback
+source check as well. (With the loopback-only bind, non-loopback sources other than
+the Tailscale proxy cannot connect at all; the check is defence in depth.)
 
 ### Why this is safe
 
-- Tailscale injects `Tailscale-User-Login` server-side; clients cannot spoof it.
-- Requests that skip the Tailscale proxy (localhost) carry no header — the bypass is
-  explicit, scoped to the local machine, and not reachable from outside.
-- Non-tailnet requests never reach the server.
+- The backend binds `127.0.0.1` only, so the **sole non-loopback path** to it is the
+  Tailscale serve proxy. This is the load-bearing assumption (see the trust-model
+  caveat above).
+- The Tailscale proxy sets `Tailscale-User-Login` server-side on every request it
+  forwards; tailnet clients cannot spoof or omit it on the proxied path.
+- The loopback bypass requires **both** a loopback `remote_addr` and an absent header —
+  a missing header alone never grants access.
+- Non-tailnet and LAN requests never reach the server (connection refused).
 
 ### Verification (once implemented)
 
+Note: any request Shaked sends through the ts.net URL from his own device gets his
+identity header injected by the proxy, so a `403` **cannot** be demonstrated from his
+own tailnet identity. The matrix below tests each property from the vantage point that
+can actually observe it.
+
+| # | Vantage point | Request | Expected | Property proven |
+|---|---------------|---------|----------|-----------------|
+| 1 | Shaked's device, via ts.net | `GET /fitness/api/status` | `200` | Tailnet read access works |
+| 2 | Shaked's device, via ts.net | `POST /fitness/api/log` | `200` | Owner identity (`klein.shaked@gmail.com`) passes write auth |
+| 3 | Laptop itself, loopback | `POST http://127.0.0.1:8080/fitness/api/log` (no header) | `200` | Loopback automation bypass works |
+| 4 | Laptop itself, loopback | `POST http://127.0.0.1:8080/fitness/api/log` with `Tailscale-User-Login: other@example.com` | `403` | Wrong identity is rejected even from loopback (spoof attempt) |
+| 5 | Any LAN device (not via Tailscale) | `curl http://<laptop-lan-ip>:8080/` | **connection refused** | Loopback-only bind holds — this failure *is* the passing test |
+| 6 | Second tailnet identity (guest device), via ts.net | `POST /fitness/api/log` | `403` | Non-owner tailnet member cannot write (run when a guest identity is available) |
+
 ```bash
-# tailnet GET → 200
+# 1 — tailnet GET
 curl -s -o /dev/null -w "%{http_code}" https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/status
 
-# POST without identity header (simulating tailnet guest who somehow injected no header)
-curl -s -o /dev/null -w "%{http_code}" -X POST https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/log
-
-# POST as Shaked (from his own device the header is injected automatically)
+# 2 — tailnet POST as owner (header injected automatically by the proxy)
 curl -s -o /dev/null -w "%{http_code}" -X POST https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/log \
   -H "Content-Type: application/json" -d '{}'
+
+# 3 — loopback bypass (run on the laptop)
+curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/fitness/api/log \
+  -H "Content-Type: application/json" -d '{}'
+
+# 4 — spoofed identity from loopback → 403
+curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/fitness/api/log \
+  -H "Tailscale-User-Login: other@example.com" -H "Content-Type: application/json" -d '{}'
+
+# 5 — LAN bind check (run from another device on the same LAN, NOT via Tailscale)
+curl -s --max-time 5 http://<laptop-lan-ip>:8080/   # expect: connection refused / timeout
 ```
 
-Expected: `200`, `403`, `200`.
+Test 5 can be run today (it verifies the Caddyfile bind, not the middleware).
+Tests 1–4 and 6 apply once the #16 middleware lands.
 
 ---
 

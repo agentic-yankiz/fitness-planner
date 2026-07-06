@@ -13,6 +13,9 @@ main changes on GitHub -> launchd service fetches origin/main -> fast-forward me
 
 No Fly.io, GitHub Pages, or other hosted deployment is used.
 
+For the multi-project path convention, threat model, and write-auth design, see
+[`docs/infra/tailscale-serving.md`](../docs/infra/tailscale-serving.md).
+
 ## What It Shows
 
 - day-by-day plan tables from `PLAN.md`

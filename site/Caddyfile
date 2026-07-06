@@ -3,8 +3,13 @@
 # The launchd service builds ./dist with BASE_PATH=/fitness, serves it on
 # localhost:8080, and asks Tailscale Serve to expose this path at:
 #   https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/
+#
+# Loopback-only bind: the ONLY non-loopback path to this server is the
+# Tailscale serve proxy (which connects to 127.0.0.1:8080). Do not widen
+# this bind — the write-auth trust model in docs/infra/tailscale-serving.md
+# depends on it.
 
-:{$FITNESS_SITE_PORT:8080} {
+127.0.0.1:{$FITNESS_SITE_PORT:8080} {
 	handle /fitness {
 		redir * /fitness/ 301
 	}

@@ -13,12 +13,22 @@
 | Training age | Advanced (strong climber) |
 
 ## Current strength benchmarks
+> Updated 2026-07-05 from coach spreadsheet (cycles 1–2, Aug–Oct 2025).
+> Delta vs prior entries shown in parentheses.
+
 | Test | Number | Notes |
 |---|---|---|
-| Weighted pull-up | Bodyweight **+30 kg** | ≈ 1.35× BW — strong base for one-arm pull-up |
-| Hang, 14 mm edge | **+20 kg** added (half-crimp) | Strong fingers; finger strength is NOT the limiter |
-| Finger target | **One-hand hang, 20 mm, both sides** | Long-term goal; trained via dedicated hangboard days, feeds the OAP |
-| Climbing | **V6** boulder | Indoor focus |
+| Weighted pull-up (chest chin-up) | **+40 kg × 4** | ↑ was +30 kg; C2 W4 D1 prescription; 40 kg first appeared in C1 W1 |
+| Max hang, 14 mm edge | **+22.5 kg × 8 s** | ↑ was +20 kg; C2 W4 D1 peak prescription (22.5 kg ×2 sets) |
+| OAP assisted (D1 heavy) | **−7.5 kg × 3** | C2 W4 D1 peak; lowest assist load reached |
+| OAP assisted (D3 volume) | **−15 kg × 5** (C2 W3) | Higher assist, higher reps — volume track |
+| Isometric hang | **+20 kg × 30 s** | C2 W3 D5 prescribed (30 s); logged 25 s × 4 in C1 W4 |
+| Chin-up iso | **+40 kg × 15 s** | C2 W3 D5 prescribed; C1 W4 D5 logged ~15–20 s |
+| BB box back squat | **100 kg** | Reached C1 W3 D1; sustained through C2 |
+| BB RDL | **100 kg** | C2 W4 D3 prescription; last logged: 95 kg × 8 (C2 W3) |
+| BB OHP | **55 kg × 4** | C2 W3; ↑ was 50 kg |
+| Climbing | **V6 sends** | First V6 in C1 deload (VKing); azure tape ×2 in C2 W1–W2 |
+| Finger target | **One-hand hang, 20 mm, both sides** | Long-term goal; feeds the OAP |
 
 ## Goals (priority order)
 1. **One-arm pull-up (OAP)** — left & right

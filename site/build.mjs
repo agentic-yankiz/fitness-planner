@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import MarkdownIt from 'markdown-it';
+import { buildRoadmap } from './roadmap/render.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');        // workout-program/
@@ -290,6 +291,8 @@ function build() {
   fs.mkdirSync(DIST, { recursive: true });
   fs.writeFileSync(path.join(DIST, 'index.html'), html);
   fs.copyFileSync(path.join(SITE, 'styles.css'), path.join(DIST, 'styles.css'));
+
+  buildRoadmap(DIST, { version: version.sha, builtAt });
 
   console.log(
     `Built dist/index.html — Block ${cur.block} Week ${cur.week} ` +

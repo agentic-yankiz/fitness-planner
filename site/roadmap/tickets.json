@@ -1,0 +1,241 @@
+{
+  "generatedAt": "2026-07-07T19:00:34.706Z",
+  "repo": "agentic-yankiz/fitness-planner",
+  "epic": 29,
+  "_curatedFields": [
+    "phase",
+    "row",
+    "deps",
+    "summary",
+    "agents",
+    "demo",
+    "short"
+  ],
+  "_liveFields": [
+    "title",
+    "state",
+    "status"
+  ],
+  "issues": [
+    {
+      "number": 24,
+      "phase": 0,
+      "row": 0,
+      "deps": [],
+      "short": "Design spec",
+      "title": "design: product + UX/UI spec for fitness site v2 (mobile-first gym companion)",
+      "state": "open",
+      "status": "blocked",
+      "summary": "PM + UX + UI spec for the site as a phone-first gym companion: Today/Week/Stats screens, bottom tab bar, chalk-proof controls, static-plan fallback. Four docs in docs/design/site-v2/. PR #31 awaits Shaked's approval.",
+      "agents": "general agent (opus) → org-kanban:reviewer → Shaked approval gate",
+      "demo": "design"
+    },
+    {
+      "number": 26,
+      "phase": 0,
+      "row": 1,
+      "deps": [],
+      "short": "Tailscale security",
+      "title": "feat(infra): Tailscale serving — multi-project path convention + Shaked-only write auth",
+      "state": "closed",
+      "status": "done",
+      "summary": "One shared tailnet host: every project owns HOST/<project>/, root reserved, never Funnel. Caddy now binds 127.0.0.1 only. Write endpoints require Tailscale identity == Shaked; localhost bypass reserved for the bot. Doc half merged (PR #30); auth middleware lands with #16.",
+      "agents": "org-kanban:executor → reviewer w/ security pass",
+      "demo": "tailscale"
+    },
+    {
+      "number": 20,
+      "phase": 0,
+      "row": 2,
+      "deps": [],
+      "short": "History import",
+      "title": "docs(tracking): import real training history from coach spreadsheet (Cycles 1–2) + reset baselines",
+      "state": "closed",
+      "status": "done",
+      "summary": "The real coach-spreadsheet program (2 cycles, 10 weeks, 6 days/week) transcribed into tracking/history/ with every logged result, and athlete-profile.md benchmarks reset to reality (+40kg chin-up, +22.5kg hang, OAP at −7.5kg). Merged as PR #32.",
+      "agents": "progress-tracker → workout-coach sanity pass",
+      "demo": "history"
+    },
+    {
+      "number": 15,
+      "phase": 0,
+      "row": 3,
+      "deps": [],
+      "short": "Today highlight",
+      "title": "feat: highlight current training day in site UI",
+      "state": "closed",
+      "status": "done",
+      "summary": "The plan page marks today's session and scrolls to it on mobile, driven by trainingDayKeywords in config.json. Already live.",
+      "agents": "shipped pre-roadmap",
+      "demo": "today"
+    },
+    {
+      "number": 33,
+      "phase": 0,
+      "row": 4,
+      "deps": [],
+      "short": "Roadmap UI",
+      "title": "feat(site): living roadmap UI — ticket dependency graph with per-ticket visual mocks",
+      "state": "open",
+      "status": "execute",
+      "summary": "This page. A dependency graph of all tickets, rebuilt from tickets.json on every site build; clicking a ticket shows a working mock of its deliverable. sync-tickets.mjs refreshes live status from GitHub.",
+      "agents": "main-session Claude → org-kanban:reviewer",
+      "demo": "roadmap"
+    },
+    {
+      "number": 16,
+      "phase": 1,
+      "row": 1,
+      "deps": [
+        26
+      ],
+      "short": "SQLite server + API",
+      "title": "feat: add SQLite-backed Node server for fitness site state",
+      "state": "closed",
+      "status": "done",
+      "summary": "A small Node server owning site/data/training.db: migrations framework, /fitness/api/* namespace, Tailscale write-auth middleware (the #26 enforcement), nightly backups. Caddy reverse-proxies to it. Foundation for Done button, stats, Telegram, and the data pipeline.",
+      "agents": "org-kanban:executor (opus) → reviewer",
+      "demo": "server"
+    },
+    {
+      "number": 21,
+      "phase": 1,
+      "row": 2,
+      "deps": [
+        20
+      ],
+      "short": "Plan rebuild",
+      "title": "feat(plan): rebuild PLAN.md as the next training cycle, reconciled with the real spreadsheet program",
+      "state": "open",
+      "status": "blocked",
+      "summary": "Rewrite PLAN.md as the next cycle seeded from real end-state numbers. BLOCKED on Shaked's three gates: days/week (profile says 4–5, reality was 6), planche priority, and who programs going forward (coach vs this repo).",
+      "agents": "workout-coach + pro-trainer skill (opus) → physio-advisor review",
+      "demo": "plan"
+    },
+    {
+      "number": 23,
+      "phase": 1,
+      "row": 3,
+      "deps": [
+        20
+      ],
+      "short": "Exercise library",
+      "title": "docs(knowledge): sync exercise-library.md with every real exercise + verified videos",
+      "state": "closed",
+      "status": "done",
+      "summary": "Every exercise from the real program (~35: cossack squat, skin the cat, spray wall, chin-up iso…) documented with cues, progressions, and a verified video link with title, grouped by movement pattern.",
+      "agents": "workout-coach (opus) → org-kanban:reviewer",
+      "demo": "library"
+    },
+    {
+      "number": 25,
+      "phase": 2,
+      "row": 0,
+      "deps": [
+        24,
+        16
+      ],
+      "short": "Site v2 UI",
+      "title": "feat(site): implement site v2 UI from the approved design spec",
+      "state": "open",
+      "status": "plan",
+      "summary": "Implements the approved wireframes: Today/Week/Stats with a bottom tab bar, the Done button and streak calendar in their final visual form, static read-only fallback when the server is down. Vanilla JS on the existing build pipeline.",
+      "agents": "org-kanban:executor → reviewer + verify-skill screenshots",
+      "demo": "sitev2"
+    },
+    {
+      "number": 17,
+      "phase": 2,
+      "row": 1,
+      "deps": [
+        16
+      ],
+      "short": "Done button",
+      "title": "feat: add Done button to mark today's training as complete",
+      "state": "open",
+      "status": "plan",
+      "summary": "One tap records today as trained (SQLite, idempotent, survives refresh). POST /fitness/api/done + GET /fitness/api/done/today. The same endpoint later serves the Telegram /done command.",
+      "agents": "org-kanban:executor → reviewer",
+      "demo": "done"
+    },
+    {
+      "number": 22,
+      "phase": 2,
+      "row": 2,
+      "deps": [
+        21
+      ],
+      "short": "Physio audit",
+      "title": "docs(physio): shoulder-safety audit of the new cycle + prehab block refresh",
+      "state": "open",
+      "status": "plan",
+      "summary": "Exercise-by-exercise anterior-shoulder risk rating (green/yellow/red) of the rebuilt plan, refreshed prehab block, and a hard progression gate: never advance flagged loads while shoulder pain trends up.",
+      "agents": "physio-advisor → workout-coach feasibility review",
+      "demo": "physio"
+    },
+    {
+      "number": 18,
+      "phase": 3,
+      "row": 1,
+      "deps": [
+        16,
+        17
+      ],
+      "short": "Stats page",
+      "title": "feat: add /stats page showing training adherence history",
+      "state": "open",
+      "status": "plan",
+      "summary": "Adherence from the sessions table: current/longest streak, week/month rates, and a 30-day calendar where rest days are neutral and only scheduled days can be 'missed'. SSR page + JSON endpoint for Telegram.",
+      "agents": "org-kanban:executor → reviewer",
+      "demo": "stats"
+    },
+    {
+      "number": 28,
+      "phase": 3,
+      "row": 2,
+      "deps": [
+        16,
+        20
+      ],
+      "short": "Data pipeline",
+      "title": "feat(data): processing pipeline — reconcile SQLite runtime state with tracking/ markdown",
+      "state": "open",
+      "status": "plan",
+      "summary": "The contract between the two stores: markdown owns the program + curated history, SQLite owns runtime capture. An export script turns DB rows into tracking/week-*.md via an agent-reviewed PR; a backfill script loads spreadsheet-era history into the DB for stats.",
+      "agents": "org-kanban:executor → progress-tracker reviews exported shape",
+      "demo": "pipeline"
+    },
+    {
+      "number": 27,
+      "phase": 4,
+      "row": 1,
+      "deps": [
+        16,
+        17,
+        26
+      ],
+      "short": "Telegram bot",
+      "title": "feat(telegram): Shaked-only Telegram bot for plan, done-marking, and quick logging",
+      "state": "open",
+      "status": "plan",
+      "summary": "Off-tailnet access from anywhere: /today, /done, /week, /stats, /log. Long-polling from the laptop (nothing exposed to the internet), hard allowlist of one Telegram user ID, silence to everyone else, every command audit-logged.",
+      "agents": "org-kanban:executor → reviewer + security pass",
+      "demo": "telegram"
+    },
+    {
+      "number": 39,
+      "phase": 3,
+      "row": 3,
+      "deps": [
+        16
+      ],
+      "short": "node:sqlite migration",
+      "title": "refactor(site): migrate better-sqlite3 → built-in node:sqlite",
+      "state": "open",
+      "status": "plan",
+      "summary": "Remove the only native dependency: the #36 deploy broke twice on Node-ABI drift (PRs #37/#38). node:sqlite (built into Node ≥22.5) is verified working on the service Node and maps 1:1 to the current driver usage.",
+      "agents": "org-kanban:executor → reviewer",
+      "demo": "sqlite"
+    }
+  ]
+}

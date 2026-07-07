@@ -53,3 +53,7 @@ jobs:
         env:
           GIT_SHA: ${{ github.sha }}
           BUILD_TIME: ${{ steps.build-time.outputs.value }}
+
+      - name: Run tests
+        run: npm test
+        working-directory: site

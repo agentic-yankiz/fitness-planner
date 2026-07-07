@@ -6,10 +6,15 @@
   "description": "Static-site generator for Shaked's workout plan (light, local, Tailscale-served).",
   "scripts": {
     "build": "node build.mjs",
-    "dev": "BASE_PATH=/fitness node build.mjs && SITE_DIST=$(pwd)/dist caddy run --config Caddyfile --adapter caddyfile",
+    "start": "node server.mjs",
+    "migrate": "node migrate.mjs",
+    "backup": "node bin/backup-db.mjs",
+    "test": "node --test",
+    "dev": "BASE_PATH=/fitness node build.mjs && (SERVER_PORT=3000 node server.mjs &) && SITE_DIST=$(pwd)/dist FITNESS_SERVER_PORT=3000 caddy run --config Caddyfile --adapter caddyfile",
     "install:launchd": "./bin/install-local-launchd.sh"
   },
   "dependencies": {
+    "better-sqlite3": "^11.10.0",
     "markdown-it": "^14.1.0"
   }
 }

@@ -5,8 +5,10 @@ ROOT="${FITNESS_PLANNER_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd
 SITE="$ROOT/site"
 LOG_DIR="${FITNESS_SITE_LOG_DIR:-$HOME/Library/Logs/fitness-planner}"
 PORT="${FITNESS_SITE_PORT:-8080}"
+SERVER_PORT="${FITNESS_SERVER_PORT:-3000}"
 BASE_PATH="${FITNESS_SITE_BASE_PATH:-/fitness}"
 SYNC_INTERVAL="${FITNESS_SITE_SYNC_INTERVAL:-60}"
+LAST_BACKUP_DAY=""
 
 mkdir -p "$LOG_DIR"
 
@@ -38,6 +40,7 @@ CADDY_BIN="$(find_binary "${CADDY_BIN:-}" "" caddy || true)"
 TAILSCALE_BIN="$(find_binary "${TAILSCALE_BIN:-}" "/Applications/Tailscale.app/Contents/MacOS/Tailscale" tailscale || true)"
 TAILSCALE_CONFIGURED=0
 RESTART_CADDY_AFTER_SYNC=0
+RESTART_SERVER_AFTER_SYNC=0
 
 if [ -z "$CADDY_BIN" ]; then
   log "missing caddy; install with: brew install caddy"
@@ -112,6 +115,10 @@ sync_main() {
     RESTART_CADDY_AFTER_SYNC=1
   fi
 
+  if printf '%s\n' "$changed_files" | grep -qE '^site/(server\.mjs|migrate\.mjs|migrations/)'; then
+    RESTART_SERVER_AFTER_SYNC=1
+  fi
+
   if printf '%s\n' "$changed_files" | grep -qx 'site/bin/local-sync-serve.sh'; then
     log "sync script changed; exiting so launchd restarts the updated service"
     exit 0
@@ -133,12 +140,26 @@ configure_tailscale_serve() {
   fi
 }
 
+start_server() {
+  # server.mjs runs pending migrations at boot and owns site/data/training.db.
+  SERVER_PORT="$SERVER_PORT" node "$SITE/server.mjs" &
+  SERVER_PID=$!
+  log "started node server pid $SERVER_PID on 127.0.0.1:${SERVER_PORT}"
+}
+
+stop_server() {
+  if [ -n "${SERVER_PID:-}" ] && kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+    kill "$SERVER_PID"
+    wait "$SERVER_PID" 2>/dev/null || true
+  fi
+}
+
 start_caddy() {
-  SITE_DIST="$SITE/dist" FITNESS_SITE_PORT="$PORT" "$CADDY_BIN" run \
+  SITE_DIST="$SITE/dist" FITNESS_SITE_PORT="$PORT" FITNESS_SERVER_PORT="$SERVER_PORT" "$CADDY_BIN" run \
     --config "$SITE/Caddyfile" \
     --adapter caddyfile &
   CADDY_PID=$!
-  log "started caddy pid $CADDY_PID on localhost:${PORT}${BASE_PATH}/"
+  log "started caddy pid $CADDY_PID on localhost:${PORT}${BASE_PATH}/ -> node:${SERVER_PORT}"
 }
 
 stop_caddy() {
@@ -148,17 +169,47 @@ stop_caddy() {
   fi
 }
 
-trap stop_caddy EXIT INT TERM
+# Nightly DB backup — runs at most once per calendar day.
+maybe_backup() {
+  local today
+  today="$(date -u '+%Y-%m-%d')"
+  if [ "$today" = "$LAST_BACKUP_DAY" ]; then
+    return 0
+  fi
+  if [ ! -f "$SITE/data/training.db" ]; then
+    return 0
+  fi
+  if (cd "$SITE" && node bin/backup-db.mjs >>"$LOG_DIR/site-backup.log" 2>&1); then
+    LAST_BACKUP_DAY="$today"
+    log "database backup written for $today"
+  else
+    log "database backup failed; see site-backup.log"
+  fi
+}
+
+cleanup() {
+  stop_caddy
+  stop_server
+}
+
+trap cleanup EXIT INT TERM
 
 cd "$ROOT" || exit 1
 install_dependencies
 build_site
+start_server
+maybe_backup
 configure_tailscale_serve
 start_caddy
 
 while true; do
   sleep "$SYNC_INTERVAL" &
   wait $!
+
+  if ! kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+    log "node server exited; restarting"
+    start_server
+  fi
 
   if ! kill -0 "$CADDY_PID" >/dev/null 2>&1; then
     log "caddy exited; restarting"
@@ -169,7 +220,15 @@ while true; do
     configure_tailscale_serve
   fi
 
+  maybe_backup
   sync_main
+
+  if [ "$RESTART_SERVER_AFTER_SYNC" -eq 1 ]; then
+    log "server code changed; restarting node"
+    stop_server
+    start_server
+    RESTART_SERVER_AFTER_SYNC=0
+  fi
 
   if [ "$RESTART_CADDY_AFTER_SYNC" -eq 1 ]; then
     log "caddy config changed; restarting"

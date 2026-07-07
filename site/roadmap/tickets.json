@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-07T05:41:29.120Z",
+  "generatedAt": "2026-07-07T05:42:41.413Z",
   "repo": "agentic-yankiz/fitness-planner",
   "epic": 29,
   "_curatedFields": [
@@ -121,8 +121,8 @@
       ],
       "short": "Exercise library",
       "title": "docs(knowledge): sync exercise-library.md with every real exercise + verified videos",
-      "state": "open",
-      "status": "in-review",
+      "state": "closed",
+      "status": "done",
       "summary": "Every exercise from the real program (~35: cossack squat, skin the cat, spray wall, chin-up iso…) documented with cues, progressions, and a verified video link with title, grouped by movement pattern.",
       "agents": "workout-coach (opus) → org-kanban:reviewer",
       "demo": "library"

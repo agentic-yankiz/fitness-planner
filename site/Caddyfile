@@ -15,7 +15,10 @@
 # handle_path strips the /fitness prefix, so Node sees /, /styles.css,
 # /api/done, etc. Do not add a request-header filter here.
 
-127.0.0.1:{$FITNESS_SITE_PORT:8080} {
+# The explicit http:// scheme matters: a bare host+port address ("127.0.0.1:8080")
+# qualifies for Caddy's automatic HTTPS, which breaks the plain-HTTP proxy chain
+# (tailscale serve → here → Node). http:// keeps the loopback-only bind, no TLS.
+http://127.0.0.1:{$FITNESS_SITE_PORT:8080} {
 	handle /fitness {
 		redir * /fitness/ 301
 	}

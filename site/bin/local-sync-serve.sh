@@ -58,10 +58,10 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 install_dependencies() {
-  if [ ! -d "$SITE/node_modules" ]; then
-    log "installing site dependencies"
-    (cd "$SITE" && npm install --no-audit --no-fund)
-  fi
+  # Always install at startup: near-instant no-op when current, and the only
+  # reliable way to pick up dependency changes across restarts.
+  log "ensuring site dependencies"
+  (cd "$SITE" && npm install --no-audit --no-fund)
 }
 
 build_site() {
@@ -95,7 +95,9 @@ sync_main() {
     return 0
   fi
 
-  package_before="$(git -C "$ROOT" rev-parse HEAD:site/package-lock.json 2>/dev/null || true)"
+  # Track package.json: there is no committed lockfile, so it is the manifest
+  # that actually signals dependency changes.
+  package_before="$(git -C "$ROOT" rev-parse HEAD:site/package.json 2>/dev/null || true)"
   changed_files="$(git -C "$ROOT" diff --name-only "$before" "$remote")"
   log "updating ${before:0:7} -> ${remote:0:7}"
   if ! git -C "$ROOT" merge --ff-only origin/main; then
@@ -103,9 +105,9 @@ sync_main() {
     return 0
   fi
 
-  package_after="$(git -C "$ROOT" rev-parse HEAD:site/package-lock.json 2>/dev/null || true)"
+  package_after="$(git -C "$ROOT" rev-parse HEAD:site/package.json 2>/dev/null || true)"
   if [ "$package_before" != "$package_after" ] || [ ! -d "$SITE/node_modules" ]; then
-    log "package lock changed; refreshing dependencies"
+    log "package.json changed; refreshing dependencies"
     (cd "$SITE" && npm install --no-audit --no-fund)
   fi
 

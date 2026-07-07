@@ -234,6 +234,19 @@ const DEMOS = {
 | Trained: YES · 18:42 |</pre>
     <p class="rm-caption">Plus a backfill: spreadsheet-era history → sessions table, so streaks include the past.</p>`,
 
+  sqlite: () => `
+    <p class="rm-note">Born from a real incident: the server deploy broke twice on native-module ABI drift
+    (dev shell runs Node 18, the launchd service Node 26 — better-sqlite3's binary can't serve both masters).</p>
+    <div class="rm-flow">
+      <span class="rm-flownode">better-sqlite3<br><small>native .node binary · ABI per Node version</small></span>
+      <span class="rm-arrow">→</span>
+      <span class="rm-flownode">node:sqlite<br><small>built into Node ≥22.5 · zero deps</small></span>
+    </div>
+    <pre class="rm-console">- import Database from 'better-sqlite3';
++ import { DatabaseSync } from 'node:sqlite';
+  // prepare / run / get / all / exec: unchanged</pre>
+    <p class="rm-caption">Kills the whole failure class of PRs #37/#38. Same migrations, same auth tests, same backups.</p>`,
+
   roadmap: () => `
     <p class="rm-note"><b>You're looking at it.</b> This page is rebuilt on every site build from
     <code>site/roadmap/tickets.json</code>: live fields (title/state/status) refresh from GitHub via

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-07T05:42:41.413Z",
+  "generatedAt": "2026-07-07T19:00:34.706Z",
   "repo": "agentic-yankiz/fitness-planner",
   "epic": 29,
   "_curatedFields": [
@@ -37,8 +37,8 @@
       "deps": [],
       "short": "Tailscale security",
       "title": "feat(infra): Tailscale serving — multi-project path convention + Shaked-only write auth",
-      "state": "open",
-      "status": "execute",
+      "state": "closed",
+      "status": "done",
       "summary": "One shared tailnet host: every project owns HOST/<project>/, root reserved, never Funnel. Caddy now binds 127.0.0.1 only. Write endpoints require Tailscale identity == Shaked; localhost bypass reserved for the bot. Doc half merged (PR #30); auth middleware lands with #16.",
       "agents": "org-kanban:executor → reviewer w/ security pass",
       "demo": "tailscale"
@@ -91,8 +91,8 @@
       ],
       "short": "SQLite server + API",
       "title": "feat: add SQLite-backed Node server for fitness site state",
-      "state": "open",
-      "status": "execute",
+      "state": "closed",
+      "status": "done",
       "summary": "A small Node server owning site/data/training.db: migrations framework, /fitness/api/* namespace, Tailscale write-auth middleware (the #26 enforcement), nightly backups. Caddy reverse-proxies to it. Foundation for Done button, stats, Telegram, and the data pipeline.",
       "agents": "org-kanban:executor (opus) → reviewer",
       "demo": "server"
@@ -221,6 +221,21 @@
       "summary": "Off-tailnet access from anywhere: /today, /done, /week, /stats, /log. Long-polling from the laptop (nothing exposed to the internet), hard allowlist of one Telegram user ID, silence to everyone else, every command audit-logged.",
       "agents": "org-kanban:executor → reviewer + security pass",
       "demo": "telegram"
+    },
+    {
+      "number": 39,
+      "phase": 3,
+      "row": 3,
+      "deps": [
+        16
+      ],
+      "short": "node:sqlite migration",
+      "title": "refactor(site): migrate better-sqlite3 → built-in node:sqlite",
+      "state": "open",
+      "status": "plan",
+      "summary": "Remove the only native dependency: the #36 deploy broke twice on Node-ABI drift (PRs #37/#38). node:sqlite (built into Node ≥22.5) is verified working on the service Node and maps 1:1 to the current driver usage.",
+      "agents": "org-kanban:executor → reviewer",
+      "demo": "sqlite"
     }
   ]
 }

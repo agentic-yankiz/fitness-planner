@@ -1,13 +1,19 @@
 # Local Caddy server for the fitness site.
 #
-# The launchd service builds ./dist with BASE_PATH=/fitness, serves it on
-# localhost:8080, and asks Tailscale Serve to expose this path at:
+# The launchd service builds ./dist with BASE_PATH=/fitness, runs the Node
+# server (server.mjs) on 127.0.0.1:3000, and reverse-proxies /fitness/* to it.
+# Tailscale Serve exposes this path at:
 #   https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/
 #
 # Loopback-only bind: the ONLY non-loopback path to this server is the
 # Tailscale serve proxy (which connects to 127.0.0.1:8080). Do not widen
 # this bind — the write-auth trust model in docs/infra/tailscale-serving.md
 # depends on it.
+#
+# reverse_proxy forwards ALL request headers unchanged, so the Tailscale
+# identity headers (Tailscale-User-Login, …) reach Node for write-auth.
+# handle_path strips the /fitness prefix, so Node sees /, /styles.css,
+# /api/done, etc. Do not add a request-header filter here.
 
 127.0.0.1:{$FITNESS_SITE_PORT:8080} {
 	handle /fitness {
@@ -15,9 +21,7 @@
 	}
 
 	handle_path /fitness/* {
-		root * {$SITE_DIST}
-		encode gzip
-		file_server
+		reverse_proxy 127.0.0.1:{$FITNESS_SERVER_PORT:3000}
 	}
 
 	handle {

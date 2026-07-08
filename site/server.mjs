@@ -39,6 +39,53 @@ const DEFAULT_DIST = path.join(__dirname, 'dist');
 const PORT = parseInt(process.env.SERVER_PORT ?? '3000', 10);
 const OWNER_EMAIL = 'klein.shaked@gmail.com';
 
+// ── Database ──────────────────────────────────────────────────────────────────
+
+/** Module-level DB handle. Injected by boot code or tests via setDb(). */
+let _db = null;
+
+/**
+ * Inject (or clear) the database handle used by API handlers.
+ * Call setDb(null) in tests to reset between suites.
+ * @param {import('better-sqlite3').Database|null} db
+ */
+export function setDb(db) {
+  _db = db;
+}
+
+/**
+ * Get the active DB. Opens lazily if not set (e.g. when router is used
+ * without explicit boot). Migrations are run on lazy open.
+ * @returns {import('better-sqlite3').Database}
+ */
+function getDb() {
+  if (!_db) {
+    _db = openDb();
+    runMigrations(_db);
+  }
+  return _db;
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Return today's date as "YYYY-MM-DD" using the server's LOCAL time zone.
+ *
+ * We deliberately use getFullYear/getMonth/getDate (local) rather than
+ * toISOString().slice(0,10) (UTC) so that a session logged at 00:30 local
+ * still counts for the new local day — important for post-midnight gym
+ * sessions in Asia/Jerusalem (UTC+3).
+ *
+ * @param {Date} [now] - injectable for tests; defaults to current time.
+ * @returns {string} e.g. "2026-07-09"
+ */
+export function localDateStr(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // Static root. Defaults to ./dist; SITE_DIST_DIR overrides it (used by tests).
 function distDir() {
   return process.env.SITE_DIST_DIR ?? DEFAULT_DIST;
@@ -182,6 +229,45 @@ function notImplemented(res) {
   });
 }
 
+// ── API handlers ──────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/done — mark today as trained (idempotent).
+ *
+ * INSERT OR IGNORE ensures a second request never overwrites the original
+ * logged_at. The row is then fetched so the original timestamp is returned.
+ *
+ * Response 200: { date, done: true, logged_at }
+ */
+function handlePostDone(res) {
+  const db = getDb();
+  const date = localDateStr();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    'INSERT OR IGNORE INTO sessions (date, done, logged_at) VALUES (?, 1, ?)',
+  ).run(date, now);
+
+  const row = db.prepare('SELECT date, done, logged_at FROM sessions WHERE date = ?').get(date);
+  sendJson(res, 200, { date: row.date, done: row.done === 1, logged_at: row.logged_at });
+}
+
+/**
+ * GET /api/done/today — check whether today has been marked done.
+ *
+ * Response 200: { date, done: bool, logged_at: string|null }
+ */
+function handleGetDoneToday(res) {
+  const db = getDb();
+  const date = localDateStr();
+  const row = db.prepare('SELECT date, done, logged_at FROM sessions WHERE date = ?').get(date);
+  sendJson(res, 200, {
+    date,
+    done: row ? row.done === 1 : false,
+    logged_at: row ? row.logged_at : null,
+  });
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 /**
@@ -197,13 +283,11 @@ export function router(req, res) {
   // Caddy strips /fitness before proxying, so these are /api/* not /fitness/api/*
 
   if (url === '/api/done' && method === 'POST') {
-    // stub — issue #17
-    return writeAuth(req, res, () => notImplemented(res));
+    return writeAuth(req, res, () => handlePostDone(res));
   }
 
   if (url === '/api/done/today' && method === 'GET') {
-    // stub — issue #17
-    return notImplemented(res);
+    return handleGetDoneToday(res);
   }
 
   if (url === '/api/stats' && method === 'GET') {
@@ -224,6 +308,7 @@ export function router(req, res) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const db = openDb();
   runMigrations(db);
+  setDb(db);
 
   const server = http.createServer(router);
 
@@ -236,6 +321,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.on(sig, () => {
       server.close(() => {
         db.close();
+        setDb(null);
         process.exit(0);
       });
     });

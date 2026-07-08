@@ -38,6 +38,28 @@ main {
   margin: 8px 0 16px;
 }
 
+/* --- done button --- */
+.done-btn {
+  display: block;
+  width: 100%;
+  padding: 14px 20px;
+  margin: 0 0 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: background 0.15s, opacity 0.15s;
+  text-align: center;
+}
+.done-btn:hover:not(:disabled) { background: #235a3e; }
+.done-btn--confirmed { opacity: 0.72; cursor: default; }
+.done-btn--saving    { opacity: 0.55; cursor: default; }
+.done-btn--error     { background: var(--muted); cursor: default; }
+
 /* --- current-week hero --- */
 .hero {
   background: var(--accent-soft);

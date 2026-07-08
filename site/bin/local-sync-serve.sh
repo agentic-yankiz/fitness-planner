@@ -69,7 +69,26 @@ build_site() {
   sha="$(git -C "$ROOT" rev-parse HEAD)"
   built_at="$(date -u '+%Y-%m-%d %H:%M UTC')"
   log "building site at ${sha:0:7}"
-  (cd "$SITE" && BASE_PATH="$BASE_PATH" GIT_SHA="$sha" BUILD_TIME="$built_at" npm run build)
+  (cd "$SITE" && BASE_PATH="$BASE_PATH" GIT_SHA="$sha" BUILD_TIME="$built_at" npm run build) \
+    && printf '%s' "$sha" > "$SITE/.last-built-sha"
+}
+
+# Rebuild whenever dist no longer matches HEAD — catches HEAD moved by anything
+# other than sync_main (an agent, a manual pull) that would otherwise leave the
+# served site silently stale.
+ensure_build_current() {
+  local head built
+  head="$(git -C "$ROOT" rev-parse HEAD)"
+  built="$(cat "$SITE/.last-built-sha" 2>/dev/null || true)"
+  if [ "$built" != "$head" ]; then
+    log "dist is stale (built ${built:0:7}, HEAD ${head:0:7}); rebuilding"
+    build_site
+    # server.mjs may have changed in the same external move — restart node too
+    # (cheap: SQLite state is on disk, downtime ~1s).
+    log "restarting node after stale rebuild"
+    stop_server
+    start_server
+  fi
 }
 
 sync_main() {
@@ -224,6 +243,7 @@ while true; do
 
   maybe_backup
   sync_main
+  ensure_build_current
 
   if [ "$RESTART_SERVER_AFTER_SYNC" -eq 1 ]; then
     log "server code changed; restarting node"

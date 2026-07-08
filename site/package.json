@@ -10,6 +10,8 @@
     "migrate": "node migrate.mjs",
     "backup": "node bin/backup-db.mjs",
     "test": "node --test",
+    "export:tracking": "node scripts/export-tracking.mjs",
+    "backfill:history": "node scripts/backfill-history.mjs",
     "dev": "BASE_PATH=/fitness node build.mjs && (SERVER_PORT=3000 node server.mjs &) && SITE_DIST=$(pwd)/dist FITNESS_SERVER_PORT=3000 caddy run --config Caddyfile --adapter caddyfile",
     "install:launchd": "./bin/install-local-launchd.sh"
   },

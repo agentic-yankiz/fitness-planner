@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T21:20:11.527Z",
+  "generatedAt": "2026-07-08T21:31:23.970Z",
   "repo": "agentic-yankiz/fitness-planner",
   "epic": 29,
   "_curatedFields": [
@@ -152,8 +152,8 @@
       ],
       "short": "Done button",
       "title": "feat: add Done button to mark today's training as complete",
-      "state": "open",
-      "status": "in-review",
+      "state": "closed",
+      "status": "done",
       "summary": "One tap records today as trained (SQLite, idempotent, survives refresh). POST /fitness/api/done + GET /fitness/api/done/today. The same endpoint later serves the Telegram /done command.",
       "agents": "org-kanban:executor → reviewer",
       "demo": "done"
@@ -200,7 +200,7 @@
       "short": "Data pipeline",
       "title": "feat(data): processing pipeline — reconcile SQLite runtime state with tracking/ markdown",
       "state": "open",
-      "status": "plan",
+      "status": "in-review",
       "summary": "The contract between the two stores: markdown owns the program + curated history, SQLite owns runtime capture. An export script turns DB rows into tracking/week-*.md via an agent-reviewed PR; a backfill script loads spreadsheet-era history into the DB for stats.",
       "agents": "org-kanban:executor → progress-tracker reviews exported shape",
       "demo": "pipeline"

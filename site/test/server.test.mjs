@@ -46,18 +46,19 @@ test('migration: creates sessions and schema_migrations tables on a fresh DB', (
   }
 });
 
-test('migration: running twice is idempotent — migration recorded exactly once', () => {
+test('migration: running twice is idempotent — no duplicate rows on re-run', () => {
   const dir = mkdtempSync(join(tmpdir(), 'fitness-migrate-'));
   try {
     const db = openDb(join(dir, 'test.db'));
 
     runMigrations(db); // first run
-    runMigrations(db); // second run — must not throw or duplicate
+    const { c: afterFirst } = db.prepare('SELECT COUNT(*) AS c FROM schema_migrations').get();
 
-    const { c } = db
-      .prepare('SELECT COUNT(*) AS c FROM schema_migrations')
-      .get();
-    assert.equal(c, 1, 'exactly one migration row recorded after two runs');
+    runMigrations(db); // second run — must not throw or duplicate
+    const { c: afterSecond } = db.prepare('SELECT COUNT(*) AS c FROM schema_migrations').get();
+
+    assert.equal(afterSecond, afterFirst, 'row count must not grow on second run (idempotent)');
+    assert.ok(afterFirst >= 1, 'at least one migration was applied');
 
     db.close();
   } finally {

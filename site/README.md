@@ -17,6 +17,7 @@ No Fly.io, GitHub Pages, or other hosted deployment is used.
 
 For the multi-project path convention, threat model, and write-auth design, see
 [`docs/infra/tailscale-serving.md`](../docs/infra/tailscale-serving.md).
+Data-flow contract (SQLite ↔ tracking/ markdown, export, backfill): [`docs/architecture-data-flow.md`](../docs/architecture-data-flow.md).
 
 ## Server, database & API
 

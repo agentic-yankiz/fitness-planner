@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
 import { openDb, runMigrations } from '../migrate.mjs';
 import { backupDb } from '../bin/backup-db.mjs';
@@ -36,7 +36,7 @@ test('backup: produces a restorable copy of the database', () => {
     const dest = backupDb({ dbPath, backupDir });
 
     // Reopen the backup and confirm the row survived.
-    const restored = new Database(dest, { readonly: true });
+    const restored = new DatabaseSync(dest, { readOnly: true });
     const row = restored.prepare('SELECT date, done FROM sessions WHERE date = ?').get('2026-07-07');
     restored.close();
 

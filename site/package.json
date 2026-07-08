@@ -16,7 +16,9 @@
     "install:launchd": "./bin/install-local-launchd.sh"
   },
   "dependencies": {
-    "better-sqlite3": "^12.11.1",
     "markdown-it": "^14.1.0"
+  },
+  "engines": {
+    "node": ">=22.5.0"
   }
 }

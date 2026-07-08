@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,18 +26,18 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
  * Creates parent directories automatically.
  *
  * @param {string} [dbPath]
- * @returns {import('better-sqlite3').Database}
+ * @returns {import('node:sqlite').DatabaseSync}
  */
 export function openDb(dbPath = process.env.DB_PATH ?? DEFAULT_DB_PATH) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  return new Database(dbPath);
+  return new DatabaseSync(dbPath);
 }
 
 /**
  * Apply any pending migrations from site/migrations/ to the given db.
  * Safe to call multiple times — already-applied migrations are skipped.
  *
- * @param {import('better-sqlite3').Database} db
+ * @param {import('node:sqlite').DatabaseSync} db
  */
 export function runMigrations(db) {
   // Ensure the tracking table exists.
@@ -66,6 +66,27 @@ export function runMigrations(db) {
     db.exec(sql);
     db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(file);
     console.log(`[migrate] applied ${file}`);
+  }
+}
+
+/**
+ * Run fn inside a BEGIN/COMMIT transaction, rolling back on any throw.
+ * (node:sqlite's DatabaseSync has no .transaction() helper like better-sqlite3.)
+ *
+ * @template T
+ * @param {import('node:sqlite').DatabaseSync} db
+ * @param {() => T} fn
+ * @returns {T}
+ */
+export function withTransaction(db, fn) {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
   }
 }
 

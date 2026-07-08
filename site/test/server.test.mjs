@@ -35,7 +35,7 @@ test('migration: creates sessions and schema_migrations tables on a fresh DB', (
     assert.ok(tables.includes('schema_migrations'), 'schema_migrations table exists');
 
     // sessions columns
-    const cols = db.pragma('table_info(sessions)').map((c) => c.name);
+    const cols = db.prepare('PRAGMA table_info(sessions)').all().map((c) => c.name);
     assert.ok(cols.includes('date'), 'date column exists');
     assert.ok(cols.includes('done'), 'done column exists');
     assert.ok(cols.includes('logged_at'), 'logged_at column exists');

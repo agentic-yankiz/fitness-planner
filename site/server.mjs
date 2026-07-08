@@ -47,7 +47,7 @@ let _db = null;
 /**
  * Inject (or clear) the database handle used by API handlers.
  * Call setDb(null) in tests to reset between suites.
- * @param {import('better-sqlite3').Database|null} db
+ * @param {import('node:sqlite').DatabaseSync|null} db
  */
 export function setDb(db) {
   _db = db;
@@ -56,7 +56,7 @@ export function setDb(db) {
 /**
  * Get the active DB. Opens lazily if not set (e.g. when router is used
  * without explicit boot). Migrations are run on lazy open.
- * @returns {import('better-sqlite3').Database}
+ * @returns {import('node:sqlite').DatabaseSync}
  */
 function getDb() {
   if (!_db) {

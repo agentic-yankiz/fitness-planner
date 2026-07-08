@@ -22,7 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb, runMigrations } from '../migrate.mjs';
+import { openDb, runMigrations, withTransaction } from '../migrate.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TRACKING_DIR = path.join(__dirname, '..', '..', 'tracking');
@@ -167,7 +167,7 @@ export async function exportTracking({ dbPath, trackingDir: trackingDirOverride 
   const markExportedLogs = db.prepare('UPDATE logs SET exported = 1 WHERE id = ?');
   const markExportedSession = db.prepare('UPDATE sessions SET exported = 1 WHERE date = ?');
 
-  const flushAll = db.transaction(() => {
+  const flushAll = () => withTransaction(db, () => {
     for (const id of logIds) markExportedLogs.run(id);
     for (const row of unexportedSessions) markExportedSession.run(row.date);
   });

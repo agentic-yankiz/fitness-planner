@@ -41,7 +41,7 @@ test('migration 002: creates logs table on fresh DB', () => {
 
     assert.ok(tables.includes('logs'), 'logs table exists');
 
-    const cols = db.pragma('table_info(logs)').map((c) => c.name);
+    const cols = db.prepare('PRAGMA table_info(logs)').all().map((c) => c.name);
     assert.ok(cols.includes('id'), 'id column');
     assert.ok(cols.includes('date'), 'date column');
     assert.ok(cols.includes('exercise'), 'exercise column');

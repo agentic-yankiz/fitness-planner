@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import http from 'node:http';
 
 import { openDb, runMigrations } from '../migrate.mjs';
-import { writeAuth, router, sendJson } from '../server.mjs';
+import { writeAuth, router, sendJson, setDb, localDateStr } from '../server.mjs';
 
 // ── 1. Migration idempotency ──────────────────────────────────────────────────
 
@@ -149,40 +149,106 @@ test('auth: GET requests always pass auth unchecked', () => {
   assert.ok(called, 'GET bypasses auth middleware');
 });
 
-// ── 3. API stub endpoint behavior ────────────────────────────────────────────
+// ── 3. Local date helper ──────────────────────────────────────────────────────
 
-// POST /api/done from loopback (auth passes) → 501 stub
-test('POST /api/done → 501 (stub, loopback bypass)', () => {
-  const req = mockReq({ method: 'POST', url: '/api/done', remoteAddress: '127.0.0.1', headers: {} });
-  const res = mockRes();
-  router(req, res);
-  assert.equal(res.statusCode, 501);
-  const body = JSON.parse(res.body);
-  assert.equal(body.error, 'Not Implemented');
+test('localDateStr: uses local date components (not UTC)', () => {
+  // Pass a fixed Date constructed from LOCAL components.
+  // new Date(year, month, day) creates a date in local time; getFullYear/Month/Date
+  // must return the same values — verifying we use local getters, not toISOString.
+  const local = new Date(2026, 6, 9); // local July 9, 2026
+  assert.equal(localDateStr(local), '2026-07-09');
+
+  // Also check padding: single-digit month and day.
+  const padCheck = new Date(2026, 0, 5); // local Jan 5, 2026
+  assert.equal(localDateStr(padCheck), '2026-01-05');
+
+  // Verify against current time: localDateStr() should match local date getters.
+  const now = new Date();
+  const expected = [
+    String(now.getFullYear()),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
+  assert.equal(localDateStr(now), expected, 'should match local date components');
 });
 
-// POST /api/done from non-owner non-loopback → 403 (auth blocks before 501)
-test('POST /api/done from non-owner non-loopback → 403', () => {
-  const req = mockReq({
-    method: 'POST',
-    url: '/api/done',
-    remoteAddress: '10.0.0.5',
-    headers: { 'tailscale-user-login': 'stranger@example.com' },
+// ── 4. API implementation — done endpoints ────────────────────────────────────
+
+/**
+ * Spin up a real HTTP server with an injected test DB.
+ * Calls fn(baseUrl, db) then tears everything down.
+ */
+async function withApiServer(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'fitness-api-'));
+  const dbPath = join(dir, 'test.db');
+  const db = openDb(dbPath);
+  runMigrations(db);
+  setDb(db);
+
+  const server = http.createServer(router);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    await fn(base, db);
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((r) => server.close(r));
+    setDb(null);
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// POST /api/done is idempotent: two POSTs produce exactly one row, same logged_at.
+test('POST /api/done: idempotent — two POSTs → one row, same logged_at', async () => {
+  await withApiServer(async (base, db) => {
+    const r1 = await fetch(`${base}/api/done`, { method: 'POST' });
+    assert.equal(r1.status, 200);
+    const b1 = await r1.json();
+    assert.equal(b1.done, true);
+    assert.ok(typeof b1.date === 'string');
+    assert.ok(typeof b1.logged_at === 'string');
+
+    const r2 = await fetch(`${base}/api/done`, { method: 'POST' });
+    assert.equal(r2.status, 200);
+    const b2 = await r2.json();
+    assert.equal(b2.logged_at, b1.logged_at, 'second POST must not overwrite logged_at');
+
+    const rows = db.prepare('SELECT * FROM sessions WHERE date = ?').all(b1.date);
+    assert.equal(rows.length, 1, 'exactly one row after two POSTs');
   });
-  const res = mockRes();
-  router(req, res);
-  assert.equal(res.statusCode, 403);
 });
 
-// GET /api/done/today → 501 (no auth gate on GETs)
-test('GET /api/done/today → 501 (stub)', () => {
-  const req = mockReq({ method: 'GET', url: '/api/done/today', remoteAddress: '10.0.0.5', headers: {} });
-  const res = mockRes();
-  router(req, res);
-  assert.equal(res.statusCode, 501);
+// GET /api/done/today round-trip: returns done:false before POST, done:true after.
+test('GET /api/done/today: round-trip with POST', async () => {
+  await withApiServer(async (base) => {
+    const before = await fetch(`${base}/api/done/today`).then((r) => r.json());
+    assert.equal(before.done, false);
+    assert.ok(typeof before.date === 'string');
+
+    await fetch(`${base}/api/done`, { method: 'POST' });
+
+    const after = await fetch(`${base}/api/done/today`).then((r) => r.json());
+    assert.equal(after.done, true);
+    assert.equal(after.date, before.date, 'same date returned');
+  });
 });
 
-// GET /api/stats → 501
+// Auth is still enforced on POST /api/done: guest header → 403.
+test('POST /api/done from guest identity → 403', async () => {
+  await withApiServer(async (base) => {
+    const res = await fetch(`${base}/api/done`, {
+      method: 'POST',
+      headers: { 'tailscale-user-login': 'guest@example.com' },
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.equal(body.error, 'Forbidden');
+  });
+});
+
+// GET /api/stats → 501 (still a stub)
 test('GET /api/stats → 501 (stub)', () => {
   const req = mockReq({ method: 'GET', url: '/api/stats', remoteAddress: '10.0.0.5', headers: {} });
   const res = mockRes();

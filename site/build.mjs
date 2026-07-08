@@ -224,6 +224,57 @@ function todayScript(cfg) {
 </script>`;
 }
 
+// ---------- done button ----------
+// Inline JS — no framework, consistent with todayScript pattern (IIFE, var,
+// no arrow functions that would be confusing for maintenance).
+// Relative URL `api/done/today` resolves via the <base> tag when BASE_PATH is
+// set (/fitness/api/done/today), and directly to /api/done/today in bare dev.
+function doneButtonHtml() {
+  return `<button id="done-btn" class="done-btn" type="button">✓ Mark trained</button>`;
+}
+
+function doneButtonScript() {
+  return `<script>
+(function(){try{
+  var btn=document.getElementById('done-btn');
+  if(!btn)return;
+
+  function pad(n){return String(n).padStart(2,'0');}
+
+  function setConfirmed(loggedAt){
+    var t=loggedAt?new Date(loggedAt):new Date();
+    btn.textContent='Trained ✓ · '+pad(t.getHours())+':'+pad(t.getMinutes());
+    btn.disabled=true;
+    btn.className='done-btn done-btn--confirmed';
+  }
+  function setError(){
+    btn.textContent='State unavailable';
+    btn.disabled=true;
+    btn.className='done-btn done-btn--error';
+  }
+  function setSaving(){
+    btn.textContent='Saving…';
+    btn.disabled=true;
+    btn.className='done-btn done-btn--saving';
+  }
+
+  /* initialise state from server */
+  fetch('api/done/today')
+    .then(function(r){return r.ok?r.json():Promise.reject(r);})
+    .then(function(d){if(d.done)setConfirmed(d.logged_at);})
+    .catch(setError);
+
+  btn.addEventListener('click',function(){
+    setSaving();
+    fetch('api/done',{method:'POST'})
+      .then(function(r){return r.ok?r.json():Promise.reject(r);})
+      .then(function(d){if(d.done)setConfirmed(d.logged_at);else setError();})
+      .catch(setError);
+  });
+}catch(e){}})();
+</script>`;
+}
+
 // ---------- page ----------
 function page({ cfg, cur, planHtml, hero, progress, version, builtAt, basePath }) {
   const shaUrl = version.sha !== 'dev'
@@ -248,6 +299,7 @@ ${baseTag}
   <header class="top">
     <h1>${esc(cfg.title)}</h1>
   </header>
+  ${doneButtonHtml()}
   ${hero}
   ${progress}
   <article class="plan">
@@ -258,7 +310,7 @@ ${baseTag}
     <span class="src">source: <code>PLAN.md</code></span>
   </footer>
 </main>
-${todayScript(cfg)}</body>
+${todayScript(cfg)}${doneButtonScript()}</body>
 </html>`;
 }
 

@@ -122,7 +122,7 @@ tail -f ~/Library/Logs/fitness-planner/site-launchd.err.log
 ## Requirements
 
 - macOS launchd
-- Node/npm
+- Node **>= 22.5** (the server uses the built-in `node:sqlite`; the launchd service runs the Homebrew Node — do not run installs with an older nvm Node)
 - Caddy (`brew install caddy`)
 - Tailscale signed in on the laptop
 

@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -47,7 +47,7 @@ export function backupDb({
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dest = path.join(backupDir, `training-${stamp}.db`);
 
-  const db = new Database(dbPath, { readonly: true });
+  const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
     // VACUUM INTO fails if the target exists; the timestamp makes that unlikely,
     // but guard anyway for repeated same-instant runs in tests.

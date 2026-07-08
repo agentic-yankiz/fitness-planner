@@ -29,7 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb, runMigrations } from '../migrate.mjs';
+import { openDb, runMigrations, withTransaction } from '../migrate.mjs';
 import { localDateStr } from '../server.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -224,7 +224,7 @@ export async function backfillHistory({ dbPath } = {}) {
     }
 
     // Insert all rows for this file in a transaction for atomicity.
-    const insertBatch = db.transaction((batchRows) => {
+    const insertBatch = (batchRows) => withTransaction(db, () => {
       let inserted = 0;
       let skipped = 0;
       for (const { date, done } of batchRows) {

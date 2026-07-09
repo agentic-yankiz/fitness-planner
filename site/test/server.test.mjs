@@ -249,12 +249,19 @@ test('POST /api/done from guest identity → 403', async () => {
   });
 });
 
-// GET /api/stats → 501 (still a stub)
-test('GET /api/stats → 501 (stub)', () => {
-  const req = mockReq({ method: 'GET', url: '/api/stats', remoteAddress: '10.0.0.5', headers: {} });
-  const res = mockRes();
-  router(req, res);
-  assert.equal(res.statusCode, 501);
+// GET /api/stats → 200 JSON with expected shape (issue #18)
+test('GET /api/stats → 200 with stats shape', async () => {
+  await withApiServer(async (base) => {
+    const res = await fetch(`${base}/api/stats`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok('currentStreak' in body, 'has currentStreak');
+    assert.ok('longestStreak' in body, 'has longestStreak');
+    assert.ok('weekRate' in body && 'done' in body.weekRate && 'scheduled' in body.weekRate, 'has weekRate');
+    assert.ok('monthRate' in body && 'done' in body.monthRate && 'scheduled' in body.monthRate, 'has monthRate');
+    assert.ok(typeof body.currentStreak === 'number', 'currentStreak is number');
+    assert.ok(typeof body.longestStreak === 'number', 'longestStreak is number');
+  });
 });
 
 // ── 4. Static file serving (real HTTP, exercises async fs + dir index) ────────

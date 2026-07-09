@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import http from 'node:http';
 
 import { openDb, runMigrations } from '../migrate.mjs';
-import { writeAuth, router, sendJson, setDb, localDateStr } from '../server.mjs';
+import { writeAuth, router, sendJson, setDb, localDateStr, todayInfo } from '../server.mjs';
 
 // ── 1. Migration idempotency ──────────────────────────────────────────────────
 
@@ -343,4 +343,151 @@ test('static: path traversal is rejected with 400', async () => {
     const res = await fetch(`${base}/%2e%2e%2f%2e%2e%2fetc%2fpasswd`);
     assert.equal(res.status, 400);
   });
+});
+
+// ── 5. GET /api/today (issue #27) ────────────────────────────────────────────
+
+test('todayInfo: training day — isTrainingDay true, shape correct', () => {
+  // Day-of-week 1 (Mon) is a training day per the default TRAINING_DAYS=[1,2,4,5].
+  // We construct a date that falls on a Monday in local time.
+  // 2026-07-06 is a Monday.
+  const info = todayInfo('2026-07-06');
+  assert.equal(typeof info.date, 'string', 'date is string');
+  assert.equal(typeof info.dayName, 'string', 'dayName is string');
+  assert.equal(typeof info.isTrainingDay, 'boolean', 'isTrainingDay is boolean');
+  assert.equal(typeof info.done, 'boolean', 'done is boolean');
+  // focus is string or null
+  assert.ok(info.focus === null || typeof info.focus === 'string', 'focus is string|null');
+  // Monday is a training day
+  assert.equal(info.isTrainingDay, true, '2026-07-06 (Mon) is a training day');
+  assert.equal(info.dayName, 'Mon');
+});
+
+test('todayInfo: rest day — isTrainingDay false', () => {
+  // 2026-07-05 is a Sunday (day-of-week 0), not in [1,2,4,5].
+  const info = todayInfo('2026-07-05');
+  assert.equal(info.isTrainingDay, false, '2026-07-05 (Sun) is a rest day');
+  assert.equal(info.dayName, 'Sun');
+});
+
+test('GET /api/today → 200 with expected shape', async () => {
+  await withApiServer(async (base) => {
+    const res = await fetch(`${base}/api/today`);
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok('date' in body, 'has date');
+    assert.ok('dayName' in body, 'has dayName');
+    assert.ok('isTrainingDay' in body, 'has isTrainingDay');
+    assert.ok('done' in body, 'has done');
+    assert.ok('focus' in body, 'has focus');
+    assert.equal(typeof body.date, 'string');
+    assert.equal(typeof body.isTrainingDay, 'boolean');
+    assert.equal(typeof body.done, 'boolean');
+  });
+});
+
+// ── 6. POST /api/log (issue #27) ─────────────────────────────────────────────
+
+test('POST /api/log with {raw} body → 200 with log id', async () => {
+  await withApiServer(async (base, db) => {
+    const res = await fetch(`${base}/api/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ raw: '3x5 pull-up @20kg', source: 'telegram' }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(typeof body.id === 'number', 'response has numeric id');
+    assert.equal(body.exercise, 'raw', 'raw field maps to exercise=raw');
+    assert.equal(body.source, 'telegram');
+
+    // Verify the row is in the DB.
+    const row = db.prepare('SELECT * FROM logs WHERE id = ?').get(body.id);
+    assert.ok(row, 'row exists in DB');
+    assert.equal(row.exercise, 'raw');
+    assert.equal(row.source, 'telegram');
+    const payload = JSON.parse(row.payload);
+    assert.equal(payload.raw, '3x5 pull-up @20kg');
+  });
+});
+
+test('POST /api/log with structured body → 200', async () => {
+  await withApiServer(async (base, db) => {
+    const res = await fetch(`${base}/api/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: '2026-07-06',
+        exercise: 'pull-up',
+        payload: JSON.stringify({ sets: 3, reps: 5 }),
+        source: 'web',
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(typeof body.id === 'number');
+    assert.equal(body.exercise, 'pull-up');
+    assert.equal(body.source, 'web');
+  });
+});
+
+test('POST /api/log with empty body → 200 (tolerant)', async () => {
+  await withApiServer(async (base) => {
+    const res = await fetch(`${base}/api/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(typeof body.id === 'number');
+  });
+});
+
+test('POST /api/log: guest identity → 403 (auth enforced)', async () => {
+  await withApiServer(async (base) => {
+    const res = await fetch(`${base}/api/log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'tailscale-user-login': 'guest@example.com',
+      },
+      body: JSON.stringify({ raw: 'hack attempt' }),
+    });
+    assert.equal(res.status, 403);
+  });
+});
+
+// ── 7. Migration 003: audit table ────────────────────────────────────────────
+
+test('migration 003: audit table exists with correct columns', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fitness-audit-'));
+  try {
+    const db = openDb(join(dir, 'test.db'));
+    runMigrations(db);
+
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all()
+      .map((r) => r.name);
+    assert.ok(tables.includes('audit'), 'audit table exists');
+
+    const cols = db.prepare('PRAGMA table_info(audit)').all().map((c) => c.name);
+    assert.ok(cols.includes('id'), 'id column');
+    assert.ok(cols.includes('at'), 'at column');
+    assert.ok(cols.includes('user_id'), 'user_id column');
+    assert.ok(cols.includes('command'), 'command column');
+    assert.ok(cols.includes('ok'), 'ok column');
+
+    // Insert a row to verify the schema is functional.
+    db.prepare('INSERT INTO audit (user_id, command, ok) VALUES (?, ?, ?)').run('42', '/today', 1);
+    const row = db.prepare('SELECT * FROM audit WHERE user_id = ?').get('42');
+    assert.equal(row.command, '/today');
+    assert.equal(row.ok, 1);
+    assert.ok(typeof row.at === 'string' && row.at.length > 0, 'at is auto-filled');
+
+    db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -290,6 +290,107 @@ function handleGetDoneToday(res) {
   });
 }
 
+// ── Today handler (issue #27) ─────────────────────────────────────────────────
+
+/**
+ * Derive today's day name and whether it is a training day from TRAINING_DAYS.
+ * Returns the same shape used by GET /api/today.
+ *
+ * @param {string} [todayStr] - injected for tests; defaults to localDateStr().
+ * @returns {{ date: string, dayName: string, isTrainingDay: boolean, done: boolean, focus: string|null }}
+ */
+export function todayInfo(todayStr = localDateStr()) {
+  const [y, m, d] = todayStr.split('-').map(Number);
+  // getDay() is 0=Sun … 6=Sat; we use local components to be consistent.
+  const dow = new Date(y, m - 1, d).getDay();
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const isTrainingDay = TRAINING_DAYS.includes(dow);
+
+  // Derive the session focus from trainingDayKeywords in config.json (same
+  // source the today-highlight script uses in build.mjs).
+  let focus = null;
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8');
+    const cfg = JSON.parse(raw);
+    if (cfg.trainingDayKeywords && cfg.trainingDayKeywords[String(dow)]) {
+      focus = cfg.trainingDayKeywords[String(dow)];
+    }
+  } catch { /* non-fatal */ }
+
+  const db = getDb();
+  const row = db.prepare('SELECT done FROM sessions WHERE date = ?').get(todayStr);
+  const done = row ? row.done === 1 : false;
+
+  return { date: todayStr, dayName: dayNames[dow], isTrainingDay, done, focus };
+}
+
+/**
+ * GET /api/today — structured summary of today's training status.
+ *
+ * Response 200: { date, dayName, isTrainingDay, done, focus }
+ *   focus: string label from trainingDayKeywords, or null on rest days.
+ */
+export function handleGetToday(res, opts = {}) {
+  const info = todayInfo(opts.todayStr);
+  sendJson(res, 200, info);
+}
+
+// ── Log handler (issue #27) ───────────────────────────────────────────────────
+
+/**
+ * POST /api/log — record an exercise log entry (tolerant schema).
+ *
+ * Accepts the #25 fields OR the Telegram shorthand { raw } — both are stored
+ * verbatim as a JSON payload so no field is silently dropped.
+ *
+ * Body fields:
+ *   { raw }          — free-form Telegram text (e.g. "/log 3×5 pull-up @20kg")
+ *   { date, exercise, payload, source, ... } — structured form from #25
+ *
+ * When raw is present the exercise is set to "raw" and the entire body is
+ * the payload. When the structured form arrives date/exercise/source are used
+ * directly. Missing date defaults to today; missing source defaults to "web".
+ *
+ * Response 200: { id, date, exercise, source }
+ */
+function handlePostLog(req, res) {
+  writeAuth(req, res, () => {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', () => {
+      let parsed = {};
+      try { parsed = JSON.parse(body || '{}'); } catch { /* tolerant */ }
+
+      const db = getDb();
+      const date = parsed.date ?? localDateStr();
+
+      let exercise, payload, source;
+
+      if (typeof parsed.raw === 'string') {
+        // Telegram shorthand: store the whole body as payload.
+        exercise = 'raw';
+        payload = JSON.stringify(parsed);
+        source = parsed.source ?? 'telegram';
+      } else {
+        exercise = parsed.exercise ?? 'unknown';
+        payload = typeof parsed.payload === 'string'
+          ? parsed.payload
+          : JSON.stringify(parsed.payload ?? parsed);
+        source = parsed.source ?? 'web';
+      }
+
+      // Validate source enum — treat unknown sources as 'web'.
+      if (source !== 'web' && source !== 'telegram') source = 'web';
+
+      const result = db.prepare(
+        `INSERT INTO logs (date, exercise, payload, source) VALUES (?, ?, ?, ?)`,
+      ).run(date, exercise, payload, source);
+
+      sendJson(res, 200, { id: Number(result.lastInsertRowid), date, exercise, source });
+    });
+  });
+}
+
 // ── Stats handlers (issue #18) ────────────────────────────────────────────────
 
 /**
@@ -505,6 +606,14 @@ export function router(req, res) {
 
   if (url === '/api/done/today' && method === 'GET') {
     return handleGetDoneToday(res);
+  }
+
+  if (url === '/api/today' && method === 'GET') {
+    return handleGetToday(res);
+  }
+
+  if (url === '/api/log' && method === 'POST') {
+    return handlePostLog(req, res);
   }
 
   if (url === '/api/stats' && method === 'GET') {

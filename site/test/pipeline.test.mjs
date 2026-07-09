@@ -63,8 +63,8 @@ test('migration 002: running twice is idempotent', () => {
     runMigrations(db);
     runMigrations(db); // second run must not throw
     const { c } = db.prepare('SELECT COUNT(*) AS c FROM schema_migrations').get();
-    // 001 + 002 = 2 migrations
-    assert.equal(c, 2, 'exactly two migration rows after two runs');
+    // 001 + 002 + 003 = 3 migrations (003 added audit table in issue #27)
+    assert.equal(c, 3, 'exactly three migration rows after two runs');
     db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

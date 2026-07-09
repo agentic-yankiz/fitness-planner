@@ -3,3 +3,4 @@ dist/
 package-lock.json
 data/
 .last-built-sha
+.env

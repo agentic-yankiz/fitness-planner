@@ -9,6 +9,7 @@ SERVER_PORT="${FITNESS_SERVER_PORT:-3000}"
 BASE_PATH="${FITNESS_SITE_BASE_PATH:-/fitness}"
 SYNC_INTERVAL="${FITNESS_SITE_SYNC_INTERVAL:-60}"
 LAST_BACKUP_DAY=""
+BOT_PID=""
 
 mkdir -p "$LOG_DIR"
 
@@ -140,6 +141,12 @@ sync_main() {
     RESTART_SERVER_AFTER_SYNC=1
   fi
 
+  if printf '%s\n' "$changed_files" | grep -qE '^site/(telegram/|\.env)'; then
+    log "telegram bot files changed; restarting bot"
+    stop_bot
+    start_bot
+  fi
+
   if printf '%s\n' "$changed_files" | grep -qx 'site/bin/local-sync-serve.sh'; then
     log "sync script changed; exiting so launchd restarts the updated service"
     exit 0
@@ -190,6 +197,41 @@ stop_caddy() {
   fi
 }
 
+# ── Telegram bot supervision ──────────────────────────────────────────────────
+# start_bot() sources site/.env and launches telegram/bot.mjs only when:
+#   1. site/.env exists, AND
+#   2. it contains TELEGRAM_BOT_TOKEN= (non-empty)
+# If unconfigured the function logs one line and returns silently.
+start_bot() {
+  local env_file="$SITE/.env"
+  if [ ! -f "$env_file" ]; then
+    log "telegram-bot: site/.env not found — bot not started (add token to activate)"
+    return 0
+  fi
+  # Check for a non-empty TELEGRAM_BOT_TOKEN without permanently exporting all
+  # variables into the shell — use a subshell grep so we don't leak secrets.
+  if ! grep -qE '^TELEGRAM_BOT_TOKEN=.+' "$env_file"; then
+    log "telegram-bot: TELEGRAM_BOT_TOKEN missing in site/.env — bot not started"
+    return 0
+  fi
+  # Source the .env into the subshell that runs the bot.
+  # shellcheck disable=SC1090
+  ( set -a; source "$env_file"; set +a
+    FITNESS_API="http://127.0.0.1:${SERVER_PORT}"
+    exec node "$SITE/telegram/bot.mjs" >>"$LOG_DIR/telegram-bot.log" 2>&1
+  ) &
+  BOT_PID=$!
+  log "started telegram-bot pid $BOT_PID"
+}
+
+stop_bot() {
+  if [ -n "${BOT_PID:-}" ] && kill -0 "$BOT_PID" >/dev/null 2>&1; then
+    kill "$BOT_PID"
+    wait "$BOT_PID" 2>/dev/null || true
+  fi
+  BOT_PID=""
+}
+
 # Nightly DB backup — runs at most once per calendar day.
 maybe_backup() {
   local today
@@ -209,6 +251,7 @@ maybe_backup() {
 }
 
 cleanup() {
+  stop_bot
   stop_caddy
   stop_server
 }
@@ -222,6 +265,7 @@ start_server
 maybe_backup
 configure_tailscale_serve
 start_caddy
+start_bot
 
 while true; do
   sleep "$SYNC_INTERVAL" &
@@ -235,6 +279,12 @@ while true; do
   if ! kill -0 "$CADDY_PID" >/dev/null 2>&1; then
     log "caddy exited; restarting"
     start_caddy
+  fi
+
+  # Restart bot if it exited unexpectedly, or if bot files / .env changed.
+  if [ -n "${BOT_PID:-}" ] && ! kill -0 "$BOT_PID" >/dev/null 2>&1; then
+    log "telegram-bot exited; restarting"
+    start_bot
   fi
 
   if [ "$TAILSCALE_CONFIGURED" -ne 1 ]; then

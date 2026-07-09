@@ -307,7 +307,7 @@ ${baseTag}
   </article>
   <footer class="stamp">
     <span>${stamp}</span>
-    <span class="src">source: <code>PLAN.md</code></span>
+    <span class="src">source: <code>PLAN.md</code> · <a href="stats">Stats</a></span>
   </footer>
 </main>
 ${todayScript(cfg)}${doneButtonScript()}</body>

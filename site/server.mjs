@@ -10,14 +10,16 @@
  * Routes (paths as seen by Node, after Caddy strips /fitness):
  *   GET  /           → serve dist/index.html
  *   GET  /styles.css → serve dist/styles.css
- *   POST /api/done         → 501 (stub — issue #17)
- *   GET  /api/done/today   → 501 (stub — issue #17)
- *   GET  /api/stats        → 501 (stub — issue #18)
+ *   POST /api/done         → mark today as trained
+ *   GET  /api/done/today   → check if today is marked done
+ *   GET  /api/stats        → JSON adherence summary
+ *   GET  /stats            → SSR adherence page
  *
  * External URLs through the full stack:
  *   POST /fitness/api/done
  *   GET  /fitness/api/done/today
  *   GET  /fitness/api/stats
+ *   GET  /fitness/stats
  *
  * Write-auth middleware (mutating routes only):
  *   • Tailscale-User-Login == klein.shaked@gmail.com  → allow (owner via proxy)
@@ -32,12 +34,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, runMigrations } from './migrate.mjs';
+import { computeStats } from './stats.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DEFAULT_DIST = path.join(__dirname, 'dist');
 const PORT = parseInt(process.env.SERVER_PORT ?? '3000', 10);
 const OWNER_EMAIL = 'klein.shaked@gmail.com';
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+/**
+ * Load trainingDays from config.json at boot.
+ * Falls back to [1,2,4,5] (Mon/Tue/Thu/Fri) if the file is missing or malformed.
+ */
+function loadTrainingDays() {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8');
+    const cfg = JSON.parse(raw);
+    if (Array.isArray(cfg.trainingDays) && cfg.trainingDays.length) {
+      return cfg.trainingDays;
+    }
+  } catch { /* fall through */ }
+  return [1, 2, 4, 5];
+}
+
+const TRAINING_DAYS = loadTrainingDays();
 
 // ── Database ──────────────────────────────────────────────────────────────────
 
@@ -268,6 +290,201 @@ function handleGetDoneToday(res) {
   });
 }
 
+// ── Stats handlers (issue #18) ────────────────────────────────────────────────
+
+/**
+ * GET /api/stats — machine-readable adherence summary.
+ *
+ * Response 200: { currentStreak, longestStreak, weekRate, monthRate }
+ * weekRate / monthRate are { done, scheduled }.
+ */
+export function handleGetApiStats(res, { trainingDays = TRAINING_DAYS, todayStr = localDateStr() } = {}) {
+  const db = getDb();
+  const rows = db.prepare('SELECT date, done FROM sessions').all();
+  const { currentStreak, longestStreak, weekRate, monthRate } = computeStats(
+    rows, trainingDays, todayStr,
+  );
+  sendJson(res, 200, { currentStreak, longestStreak, weekRate, monthRate });
+}
+
+/**
+ * Render an emoji-free calendar cell.
+ * @param {'trained'|'missed'|'upcoming'|'rest'} state
+ */
+function cellHtml(date, state) {
+  const d = date.slice(8); // day-of-month
+  const labels = {
+    trained:  'Trained',
+    missed:   'Missed',
+    upcoming: 'Upcoming',
+    rest:     'Rest',
+  };
+  return `<td class="cal-cell cal-${state}" title="${date} — ${labels[state]}">${d}</td>`;
+}
+
+/** Mon-first weekday headers */
+const WEEK_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/**
+ * Build a Mon-first calendar grid HTML for the days array.
+ * Pads the first row with empty cells so Mon is column 0.
+ */
+function calendarGridHtml(days) {
+  if (!days.length) return '<p class="empty">No data yet — start training and rows will appear here.</p>';
+
+  // Build weeks (Mon-first). Each day.date is "YYYY-MM-DD"; getDay() is 0=Sun.
+  const rows = [];
+  let week = null;
+
+  // Pad the first week so Mon is column 0.
+  {
+    const [y, m, d] = days[0].date.split('-').map(Number);
+    const firstDow = new Date(y, m - 1, d).getDay(); // 0=Sun
+    const padCols = (firstDow + 6) % 7; // Mon=0
+    week = Array(padCols).fill(null);
+  }
+
+  for (const day of days) {
+    const [y, m, d] = day.date.split('-').map(Number);
+    const dow = new Date(y, m - 1, d).getDay();
+    const col = (dow + 6) % 7; // Mon=0 … Sun=6
+    if (col === 0 && week !== null && week.length > 0) {
+      rows.push(week);
+      week = [];
+    }
+    week.push(day);
+  }
+  if (week && week.length) rows.push(week);
+
+  const headerRow = WEEK_HEADERS.map((h) => `<th>${h}</th>`).join('');
+  const bodyRows = rows.map((row) => {
+    const cells = [];
+    for (let i = 0; i < 7; i++) {
+      const cell = row[i];
+      if (!cell) {
+        cells.push('<td class="cal-cell cal-empty"></td>');
+      } else {
+        cells.push(cellHtml(cell.date, cell.state));
+      }
+    }
+    return `<tr>${cells.join('')}</tr>`;
+  }).join('');
+
+  return `<table class="cal-grid">
+  <thead><tr>${headerRow}</tr></thead>
+  <tbody>${bodyRows}</tbody>
+</table>`;
+}
+
+/**
+ * GET /stats — SSR adherence page.
+ *
+ * Same chrome as the main page (header + footer + link to styles.css).
+ * Shows: current streak, longest streak, week/month rates, 30-day calendar grid.
+ */
+export function handleGetStatsPage(res, { trainingDays = TRAINING_DAYS, todayStr = localDateStr() } = {}) {
+  const db = getDb();
+  const rows = db.prepare('SELECT date, done FROM sessions').all();
+  const { currentStreak, longestStreak, weekRate, monthRate, days } = computeStats(
+    rows, trainingDays, todayStr,
+  );
+
+  const isEmpty = rows.length === 0;
+  const emptyMsg = isEmpty
+    ? '<p class="empty stats-empty">No sessions logged yet — hit the Done button on the <a href=".">plan page</a> after your first workout.</p>'
+    : '';
+
+  const weekPct = weekRate.scheduled
+    ? Math.round((weekRate.done / weekRate.scheduled) * 100)
+    : null;
+  const monthPct = monthRate.scheduled
+    ? Math.round((monthRate.done / monthRate.scheduled) * 100)
+    : null;
+
+  const fmtRate = ({ done, scheduled }, pct) =>
+    scheduled
+      ? `${done}/${scheduled}${pct !== null ? ` (${pct}%)` : ''}`
+      : '—';
+
+  const grid = isEmpty ? '' : calendarGridHtml(days);
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Adherence Stats</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+.stats-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 24px; margin: 0 0 24px; }
+@media (max-width: 400px) { .stats-summary { grid-template-columns: 1fr; } }
+.stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; }
+.stat-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 4px; }
+.stat-value { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+.stat-unit  { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
+.cal-section { margin: 0 0 28px; }
+.cal-section h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.cal-grid { border-collapse: collapse; font-size: 0.82rem; }
+.cal-grid th { padding: 4px 8px; text-align: center; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.cal-cell { width: 36px; height: 32px; text-align: center; border-radius: 6px; font-size: 0.82rem; }
+.cal-trained  { background: var(--accent); color: #fff; font-weight: 600; }
+.cal-missed   { background: #fee2e2; color: #b91c1c; }
+.cal-upcoming { background: var(--accent-soft); color: var(--accent); }
+.cal-rest     { color: var(--muted); }
+.cal-empty    { background: transparent; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); margin: 10px 0 0; }
+.legend-dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
+.stats-empty { margin: 24px 0; }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <h1><a href="." style="color:inherit;text-decoration:none">Shaked's Workout Plan</a></h1>
+  </header>
+  <h2 style="margin:0 0 16px;font-size:1.3rem">Adherence Stats</h2>
+  ${emptyMsg}
+  <div class="stats-summary">
+    <div class="stat-card">
+      <p class="stat-label">Current Streak</p>
+      <p class="stat-value">${currentStreak} <span class="stat-unit">days</span></p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-label">Longest Streak</p>
+      <p class="stat-value">${longestStreak} <span class="stat-unit">days</span></p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-label">This Week</p>
+      <p class="stat-value">${fmtRate(weekRate, weekPct)}</p>
+    </div>
+    <div class="stat-card">
+      <p class="stat-label">This Month</p>
+      <p class="stat-value">${fmtRate(monthRate, monthPct)}</p>
+    </div>
+  </div>
+  <section class="cal-section">
+    <h2>Last 30 Days</h2>
+    ${grid}
+    ${isEmpty ? '' : `<div class="legend">
+      <span><span class="legend-dot" style="background:var(--accent)"></span>Trained</span>
+      <span><span class="legend-dot" style="background:#fee2e2"></span>Missed</span>
+      <span><span class="legend-dot" style="background:var(--accent-soft)"></span>Upcoming / Today</span>
+      <span><span class="legend-dot" style="background:var(--line)"></span>Rest</span>
+    </div>`}
+  </section>
+  <footer class="stamp">
+    <span>adherence as of ${todayStr}</span>
+    <span class="src"><a href=".">back to plan</a></span>
+  </footer>
+</main>
+</body>
+</html>`;
+
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(html);
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 /**
@@ -291,8 +508,11 @@ export function router(req, res) {
   }
 
   if (url === '/api/stats' && method === 'GET') {
-    // stub — issue #18
-    return notImplemented(res);
+    return handleGetApiStats(res);
+  }
+
+  if (url === '/stats' && method === 'GET') {
+    return handleGetStatsPage(res);
   }
 
   // ── Static assets ─────────────────────────────────────────────────────────

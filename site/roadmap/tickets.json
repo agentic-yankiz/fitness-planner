@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-08T21:39:17.988Z",
+  "generatedAt": "2026-07-09T21:17:44.271Z",
   "repo": "agentic-yankiz/fitness-planner",
   "epic": 29,
   "_curatedFields": [
@@ -184,7 +184,7 @@
       "short": "Stats page",
       "title": "feat: add /stats page showing training adherence history",
       "state": "open",
-      "status": "plan",
+      "status": "in-review",
       "summary": "Adherence from the sessions table: current/longest streak, week/month rates, and a 30-day calendar where rest days are neutral and only scheduled days can be 'missed'. SSR page + JSON endpoint for Telegram.",
       "agents": "org-kanban:executor → reviewer",
       "demo": "stats"
@@ -231,8 +231,8 @@
       ],
       "short": "node:sqlite migration",
       "title": "refactor(site): migrate better-sqlite3 → built-in node:sqlite",
-      "state": "open",
-      "status": "in-review",
+      "state": "closed",
+      "status": "done",
       "summary": "Remove the only native dependency: the #36 deploy broke twice on Node-ABI drift (PRs #37/#38). node:sqlite (built into Node ≥22.5) is verified working on the service Node and maps 1:1 to the current driver usage.",
       "agents": "org-kanban:executor → reviewer",
       "demo": "sqlite"

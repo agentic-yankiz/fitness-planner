@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-09T21:17:44.271Z",
+  "generatedAt": "2026-07-10T00:00:00.000Z",
   "repo": "agentic-yankiz/fitness-planner",
   "epic": 29,
   "_curatedFields": [
@@ -183,9 +183,9 @@
       ],
       "short": "Stats page",
       "title": "feat: add /stats page showing training adherence history",
-      "state": "open",
-      "status": "in-review",
-      "summary": "Adherence from the sessions table: current/longest streak, week/month rates, and a 30-day calendar where rest days are neutral and only scheduled days can be 'missed'. SSR page + JSON endpoint for Telegram.",
+      "state": "closed",
+      "status": "done",
+      "summary": "Adherence from the sessions table: current/longest streak, week/month rates, and a 30-day calendar where rest days are neutral and only scheduled days can be 'missed'. SSR page + JSON endpoint for Telegram. Merged PR #44.",
       "agents": "org-kanban:executor → reviewer",
       "demo": "stats"
     },
@@ -217,8 +217,8 @@
       "short": "Telegram bot",
       "title": "feat(telegram): Shaked-only Telegram bot for plan, done-marking, and quick logging",
       "state": "open",
-      "status": "plan",
-      "summary": "Off-tailnet access from anywhere: /today, /done, /week, /stats, /log. Long-polling from the laptop (nothing exposed to the internet), hard allowlist of one Telegram user ID, silence to everyone else, every command audit-logged.",
+      "status": "in-review",
+      "summary": "Off-tailnet access from anywhere: /today, /done, /week, /stats, /log. Long-polling from the laptop (nothing exposed to the internet), hard allowlist of one Telegram user ID, silence to everyone else, every command audit-logged. Code shipped; activation gated on Shaked's .env (BotFather token + owner ID).",
       "agents": "org-kanban:executor → reviewer + security pass",
       "demo": "telegram"
     },

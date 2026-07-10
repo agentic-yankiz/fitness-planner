@@ -1,48 +1,43 @@
 ---
 name: kanban
-description: Read GitHub issues and display them as a kanban backlog. Use when Shaked asks "show kanban", "kanban", "show backlog", "what issues are open", "show issues", or "what's in the backlog".
+description: Use the agentic-yankiz GitHub Projects v2 Kanban board for fitness-planner issues and PRs. Use when Shaked asks for kanban, backlog, issues, board status, or moving work.
 ---
 
-# Kanban Board
+# Fitness Planner Kanban
 
-Display the project's GitHub issues organized as a kanban board with columns for
-Backlog, In Progress, and Done.
+Use the org Kanban workflow for `agentic-yankiz/fitness-planner`.
 
-## One-time setup (run once if `in-progress` label is missing)
+## Rules
 
+1. Start from the repo GitHub Projects v2 board: `Fitness Planner Kanban`.
+2. Prefer the runtime GitHub MCP/app connector for issue, PR, label, comment,
+   and Project updates when available.
+3. If no connector is available, use `gh` authenticated as `yankihermesapp[bot]`.
+4. Every issue and PR must carry `type:*`, `priority:*`, `area:*`, and the
+   current `status:*`.
+5. Move the Project card on every transition: `Backlog`, `Refine`, `Plan`,
+   `Execute`, `In review`, `Done`, or `Blocked`.
+6. Never leave completed work in `No Status`.
+
+## Show Board
+
+```bash
+gh issue list --repo agentic-yankiz/fitness-planner --state open \
+  --json number,title,labels,assignees,url
 ```
-gh label create "in-progress" --color "#0052cc" --description "Currently being worked on"
+
+Render issues grouped by their `status:*` label. Closed issues are `Done`.
+
+## Move Work
+
+Use the shared org skill when available:
+
+```bash
+/update-kanban <issue-or-pr-number> <column> --repo agentic-yankiz/fitness-planner
 ```
 
-## Steps
+If the skill is unavailable, update both:
+- the GitHub Projects v2 Status field; and
+- the matching `status:*` label.
 
-1. Run `gh issue list --state open --limit 50 --json number,title,labels,assignees` to fetch open issues.
-2. Run `gh issue list --state closed --limit 10 --json number,title,labels` to fetch recent closed issues.
-3. Parse the JSON output and categorize issues:
-   - **In Progress**: open and has label `in-progress`
-   - **Done**: is closed
-   - **Backlog**: open and no `in-progress` label
-4. Render a clean kanban view:
-   - Use markdown tables for each column (# | Title | Labels | Assignee).
-   - Show issue numbers as `#N` links (e.g., `#13`).
-   - Omit assignee/labels columns if empty across all issues in that section.
-   - Keep it scannable: one row per issue, no word wrap.
-5. After the board, offer to move an issue by editing its labels (ask which issue and where).
-
-## Output rules
-
-- Header: `## Kanban Board`
-- Section headers: `### Backlog`, `### In Progress`, `### Done`
-- Show "(empty)" under a section if there are no issues.
-- Keep titles short; truncate with `...` if > 60 chars.
-- If a section has issues, show the count in parentheses, e.g., `### Backlog (3)`.
-- Do not explain what the board is — just show it.
-- End with: "To move an issue, say `move #N to <In Progress|Done|Backlog>`" (if there are any open issues).
-
-## Moving issues
-
-If Shaked says "move #N to <column>":
-- **To In Progress**: `gh issue edit N --add-label in-progress` (creates the label if it doesn't exist — see setup above)
-- **To Backlog**: `gh issue edit N --remove-label in-progress`
-- **To Done**: `gh issue close N`
-- Confirm the move and re-render the board.
+Confirm the move and show the updated item.

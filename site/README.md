@@ -9,9 +9,12 @@ The canonical deploy is local-only:
 ```text
 main changes on GitHub -> launchd service fetches origin/main -> fast-forward merge
   -> npm build (./dist) + node server.mjs on 127.0.0.1:3000
-  -> Caddy reverse-proxies /fitness/* -> 127.0.0.1:3000 on localhost:8080
   -> Tailscale Serve exposes https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/
 ```
+
+Tailscale Serve strips `/fitness` before proxying, so the tailnet route points directly
+at the Node server root. Caddy remains available as a local convenience proxy at
+`http://localhost:8080/fitness/`.
 
 No Fly.io, GitHub Pages, or other hosted deployment is used.
 
@@ -24,14 +27,13 @@ Data-flow contract (SQLite ↔ tracking/ markdown, export, backfill): [`docs/arc
 `server.mjs` (default port `3000`, override with `SERVER_PORT`) does three things:
 
 1. **Serves the static build** for `GET /fitness/*`, including directory indexes
-   (`/fitness/roadmap/` -> `dist/roadmap/index.html`). Caddy strips the `/fitness`
-   prefix, so the server sees `/`, `/styles.css`, `/api/...`.
+   (`/fitness/roadmap/` -> `dist/roadmap/index.html`). Tailscale Serve strips the
+   `/fitness` prefix, so the server sees `/`, `/styles.css`, `/api/...`.
 2. **Owns `site/data/training.db`** (gitignored), a SQLite database managed with
    `better-sqlite3`.
-3. **Exposes the `/fitness/api/*` namespace.** `POST /fitness/api/done`,
-   `GET /fitness/api/done/today`, and `GET /fitness/api/stats` currently return `501`
-   stubs — they are implemented by issues #17 / #18. The routing skeleton, write-auth
-   middleware, and JSON error shape are live now.
+3. **Exposes the `/fitness/api/*` namespace.** `POST /fitness/api/done` marks today
+   trained, `GET /fitness/api/done/today` reads that state, and `GET /fitness/api/stats`
+   currently returns a `501` stub for issue #18.
 
 ### Write-auth
 
@@ -81,7 +83,7 @@ npm run dev   # builds ./dist, starts server.mjs (:3000), runs Caddy (:8080)
 
 Then open:
 
-- local: `http://localhost:8080/fitness/`
+- local through Caddy: `http://localhost:8080/fitness/`
 - Tailscale, after serve is configured:
   `https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/`
 

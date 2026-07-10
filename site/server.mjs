@@ -4,14 +4,16 @@
  *
  * Topology:
  *   Tailscale Serve (TLS + identity headers)
- *     → Caddy :8080 (strip /fitness prefix, forward to this server)
- *       → Node :3000 (this file)
+ *     → Node :3000 (this file; Tailscale strips /fitness before proxying)
  *
- * Routes (paths as seen by Node, after Caddy strips /fitness):
+ * Local convenience route:
+ *   Caddy :8080 (strip /fitness prefix, forward to this server)
+ *
+ * Routes (paths as seen by Node, after the public /fitness prefix is stripped):
  *   GET  /           → serve dist/index.html
  *   GET  /styles.css → serve dist/styles.css
- *   POST /api/done         → 501 (stub — issue #17)
- *   GET  /api/done/today   → 501 (stub — issue #17)
+ *   POST /api/done         → mark today trained
+ *   GET  /api/done/today   → read today's trained state
  *   GET  /api/stats        → 501 (stub — issue #18)
  *
  * External URLs through the full stack:
@@ -280,7 +282,8 @@ export function router(req, res) {
   const url = (req.url ?? '/').split('?')[0];
 
   // ── API endpoints ─────────────────────────────────────────────────────────
-  // Caddy strips /fitness before proxying, so these are /api/* not /fitness/api/*
+  // Tailscale Serve and local Caddy strip /fitness before proxying, so these
+  // are /api/* not /fitness/api/*.
 
   if (url === '/api/done' && method === 'POST') {
     return writeAuth(req, res, () => handlePostDone(res));

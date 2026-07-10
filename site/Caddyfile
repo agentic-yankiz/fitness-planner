@@ -1,23 +1,23 @@
 # Local Caddy server for the fitness site.
 #
-# The launchd service builds ./dist with BASE_PATH=/fitness, runs the Node
-# server (server.mjs) on 127.0.0.1:3000, and reverse-proxies /fitness/* to it.
-# Tailscale Serve exposes this path at:
+# The launchd service builds ./dist with BASE_PATH=/fitness and runs the Node
+# server (server.mjs) on 127.0.0.1:3000. Tailscale Serve exposes this path by
+# proxying /fitness directly to the Node server root:
 #   https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/
 #
-# Loopback-only bind: the ONLY non-loopback path to this server is the
-# Tailscale serve proxy (which connects to 127.0.0.1:8080). Do not widen
-# this bind — the write-auth trust model in docs/infra/tailscale-serving.md
-# depends on it.
+# This Caddy route is kept for local browser access at:
+#   http://localhost:8080/fitness/
 #
-# reverse_proxy forwards ALL request headers unchanged, so the Tailscale
-# identity headers (Tailscale-User-Login, …) reach Node for write-auth.
-# handle_path strips the /fitness prefix, so Node sees /, /styles.css,
-# /api/done, etc. Do not add a request-header filter here.
+# Loopback-only bind: this local convenience proxy must not be reachable from
+# the LAN. Do not widen this bind — the write-auth trust model in
+# docs/infra/tailscale-serving.md depends on loopback-only backends.
+#
+# reverse_proxy forwards ALL request headers unchanged. handle_path strips the
+# /fitness prefix, so Node sees /, /styles.css, /api/done, etc.
 
 # The explicit http:// scheme matters: a bare host+port address ("127.0.0.1:8080")
-# qualifies for Caddy's automatic HTTPS, which breaks the plain-HTTP proxy chain
-# (tailscale serve → here → Node). http:// keeps the loopback-only bind, no TLS.
+# qualifies for Caddy's automatic HTTPS. http:// keeps this local route on a
+# loopback-only plain-HTTP bind.
 http://127.0.0.1:{$FITNESS_SITE_PORT:8080} {
 	handle /fitness {
 		redir * /fitness/ 301

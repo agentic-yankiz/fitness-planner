@@ -152,7 +152,10 @@ configure_tailscale_serve() {
     return 0
   fi
 
-  if "$TAILSCALE_BIN" serve --yes --bg --https=443 --set-path="$BASE_PATH" "http://127.0.0.1:${PORT}${BASE_PATH}" >/dev/null 2>&1; then
+  # Tailscale Serve strips BASE_PATH before proxying, so the target must be the
+  # Node server root. Pointing it at Caddy's /fitness route would strip the path
+  # once in Tailscale and then ask Caddy to route a bare "/" request.
+  if "$TAILSCALE_BIN" serve --yes --bg --https=443 --set-path="$BASE_PATH" "http://127.0.0.1:${SERVER_PORT}" >/dev/null 2>&1; then
     TAILSCALE_CONFIGURED=1
     log "tailscale serve configured at ${BASE_PATH}/"
   else
@@ -180,7 +183,7 @@ start_caddy() {
     --config "$SITE/Caddyfile" \
     --adapter caddyfile &
   CADDY_PID=$!
-  log "started caddy pid $CADDY_PID on localhost:${PORT}${BASE_PATH}/ -> node:${SERVER_PORT}"
+  log "started local caddy pid $CADDY_PID on localhost:${PORT}${BASE_PATH}/ -> node:${SERVER_PORT}"
 }
 
 stop_caddy() {

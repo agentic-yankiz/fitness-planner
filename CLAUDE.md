@@ -24,6 +24,9 @@ plus a shoulder-physio block for a flagged left front-shoulder issue.
 - **Skills** (`.claude/skills/`): `show-weekly-plan`, `log-workout`, `advance-week`,
   `pro-trainer` (evidence + logged-results coaching), `grill-me` (stress-test a plan/decision),
   `kanban` (show GitHub issue backlog as a kanban board).
+- For project work, use the org Kanban/MCP baseline: check `Fitness Planner Kanban`,
+  prefer the GitHub MCP/app connector when available, and keep `status:*` labels
+  plus the Project card current.
 - Run Claude from inside `workout-program/` so these are picked up.
 
 ## Backlog

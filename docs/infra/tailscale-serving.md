@@ -20,7 +20,7 @@ Captured 2026-07-07:
 
 ```text
 https://shakeds-macbook-pro-2.tail0b783.ts.net (tailnet only)
-|-- /fitness proxy http://127.0.0.1:8080/fitness
+|-- /fitness proxy http://127.0.0.1:3000
 ```
 
 No Funnel entry is present. To verify at any time:
@@ -37,9 +37,9 @@ The output must say `(tailnet only)` — never `(Funnel)`.
 
 ## Path convention
 
-| Path prefix | Project | Caddy port |
+| Path prefix | Project | Backend port |
 |-------------|---------|------------|
-| `/fitness`  | fitness-planner (this repo) | 8080 |
+| `/fitness`  | fitness-planner (this repo) | 3000 |
 | `/`         | *reserved — future index* | — |
 
 Rules:
@@ -59,15 +59,18 @@ Rules:
 ### 1. Register the Tailscale path
 
 ```bash
-tailscale serve --yes --bg --https=443 --set-path=/<project> http://127.0.0.1:<port>/<project>
+tailscale serve --yes --bg --https=443 --set-path=/<project> http://127.0.0.1:<port>
 ```
 
-Replace `<project>` with the new project's path prefix and `<port>` with the local Caddy
-port for that project (pick a free port, e.g. 8081, 8082, …).
+Replace `<project>` with the new project's path prefix and `<port>` with the local backend
+port for that project. Tailscale Serve strips the public path before proxying, so do not
+repeat `/<project>` in the target URL.
 
-### 2. Add a `handle_path` block to the project's Caddyfile
+### 2. Add a local proxy if needed
 
-The existing fitness Caddyfile demonstrates the pattern:
+The fitness site keeps a Caddy route for local browser access at
+`http://localhost:8080/fitness/`, but Tailscale Serve proxies directly to Node. If a new
+project needs the same local path convenience, use this pattern:
 
 ```caddy
 # Loopback-only bind — never `:<port>` (see path-convention rules)
@@ -99,10 +102,9 @@ header {
 }
 ```
 
-> The `handle_path` directive strips the prefix before passing the request to
-> `file_server`, so the build artefacts in `./dist` don't need to mirror the prefix.
-> `BASE_PATH=/<project>` must be passed to the Vite/build step so asset URLs are
-> rooted correctly.
+> The `handle_path` directive strips the prefix before passing the request to the local
+> app, matching Tailscale Serve's path stripping. `BASE_PATH=/<project>` must still be
+> passed to the build step so browser asset and API URLs are rooted correctly.
 
 ### 3. Wire up the launchd service (macOS)
 
@@ -148,7 +150,6 @@ tailscale funnel off
 | Same-LAN attacker (not on the tailnet) | Unreachable. The backend binds `127.0.0.1` only, so `laptop-lan-ip:<port>` refuses the connection — the only non-loopback path is the Tailscale proxy. |
 | Tailnet guest (another device on the tailnet) | Read-only access to GET routes. Write routes are protected by identity headers — see the write-auth design below. |
 | Local process on the laptop | Trusted. The machine is a single-user device; the loopback bypass for automation is deliberate — see write-auth design. |
-| Caddy stripping identity headers | Not a risk: the current Caddyfile `header {}` block only removes `Server` and sets two response headers; it does not touch request headers forwarded from Tailscale. |
 
 ### Identity-header topology
 
@@ -160,9 +161,10 @@ forwarding to the local backend:
 - `Tailscale-User-Profile-Pic` — profile image URL
 
 These headers are present on all requests that arrive via the Tailscale serve proxy.
-Requests that arrive directly at the Caddy port (`127.0.0.1:8080`) do **not** carry
-these headers — unless the local client sets them itself, which is why identity
-alone is never sufficient (see the trust-model caveat below).
+Requests that arrive directly at the Node port (`127.0.0.1:3000`) or local Caddy port
+(`127.0.0.1:8080`) do **not** carry these headers unless the local client sets them
+itself, which is why identity alone is never sufficient (see the trust-model caveat
+below).
 
 > **Trust-model caveat.** These identity headers are trustworthy **only** because the
 > sole non-loopback path to the backend is the Tailscale serve proxy, which sets (and
@@ -173,10 +175,7 @@ alone is never sufficient (see the trust-model caveat below).
 
 ---
 
-## Write-auth design (implemented in #16 / #26 follow-up)
-
-> **This section describes the intended enforcement. The middleware is not yet
-> implemented — it lands with issue #16.**
+## Write-auth design
 
 ### Requirement
 
@@ -217,7 +216,7 @@ the Tailscale proxy cannot connect at all; the check is defence in depth.)
   a missing header alone never grants access.
 - Non-tailnet and LAN requests never reach the server (connection refused).
 
-### Verification (once implemented)
+### Verification
 
 Note: any request Shaked sends through the ts.net URL from his own device gets his
 identity header injected by the proxy, so a `403` **cannot** be demonstrated from his
@@ -226,35 +225,34 @@ can actually observe it.
 
 | # | Vantage point | Request | Expected | Property proven |
 |---|---------------|---------|----------|-----------------|
-| 1 | Shaked's device, via ts.net | `GET /fitness/api/status` | `200` | Tailnet read access works |
-| 2 | Shaked's device, via ts.net | `POST /fitness/api/log` | `200` | Owner identity (`klein.shaked@gmail.com`) passes write auth |
-| 3 | Laptop itself, loopback | `POST http://127.0.0.1:8080/fitness/api/log` (no header) | `200` | Loopback automation bypass works |
-| 4 | Laptop itself, loopback | `POST http://127.0.0.1:8080/fitness/api/log` with `Tailscale-User-Login: other@example.com` | `403` | Wrong identity is rejected even from loopback (spoof attempt) |
+| 1 | Shaked's device, via ts.net | `GET /fitness/api/done/today` | `200` | Tailnet read access works |
+| 2 | Shaked's device, via ts.net | `POST /fitness/api/done` | `200` | Owner identity (`klein.shaked@gmail.com`) passes write auth |
+| 3 | Laptop itself, loopback | `POST http://127.0.0.1:8080/fitness/api/done` (no header) | `200` | Loopback automation bypass works |
+| 4 | Laptop itself, loopback | `POST http://127.0.0.1:8080/fitness/api/done` with `Tailscale-User-Login: other@example.com` | `403` | Wrong identity is rejected even from loopback (spoof attempt) |
 | 5 | Any LAN device (not via Tailscale) | `curl http://<laptop-lan-ip>:8080/` | **connection refused** | Loopback-only bind holds — this failure *is* the passing test |
-| 6 | Second tailnet identity (guest device), via ts.net | `POST /fitness/api/log` | `403` | Non-owner tailnet member cannot write (run when a guest identity is available) |
+| 6 | Second tailnet identity (guest device), via ts.net | `POST /fitness/api/done` | `403` | Non-owner tailnet member cannot write (run when a guest identity is available) |
 
 ```bash
 # 1 — tailnet GET
-curl -s -o /dev/null -w "%{http_code}" https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/status
+curl -s -o /dev/null -w "%{http_code}" https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/done/today
 
 # 2 — tailnet POST as owner (header injected automatically by the proxy)
-curl -s -o /dev/null -w "%{http_code}" -X POST https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/log \
+curl -s -o /dev/null -w "%{http_code}" -X POST https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/done \
   -H "Content-Type: application/json" -d '{}'
 
 # 3 — loopback bypass (run on the laptop)
-curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/fitness/api/log \
+curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/fitness/api/done \
   -H "Content-Type: application/json" -d '{}'
 
 # 4 — spoofed identity from loopback → 403
-curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/fitness/api/log \
+curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8080/fitness/api/done \
   -H "Tailscale-User-Login: other@example.com" -H "Content-Type: application/json" -d '{}'
 
 # 5 — LAN bind check (run from another device on the same LAN, NOT via Tailscale)
 curl -s --max-time 5 http://<laptop-lan-ip>:8080/   # expect: connection refused / timeout
 ```
 
-Test 5 can be run today (it verifies the Caddyfile bind, not the middleware).
-Tests 1–4 and 6 apply once the #16 middleware lands.
+Test 5 verifies the Caddyfile bind, not the middleware.
 
 ---
 

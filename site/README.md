@@ -10,7 +10,7 @@ The canonical deploy is local-only:
 main changes on GitHub -> launchd service fetches origin/main -> fast-forward merge
   -> npm build (./dist) + node server.mjs on 127.0.0.1:3000
   -> Caddy reverse-proxies /fitness/* -> 127.0.0.1:3000 on localhost:8080
-  -> Tailscale Serve exposes https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/
+  -> Tailscale Serve exposes https://shakedm2.tail0b783.ts.net/fitness/
 ```
 
 No Fly.io, GitHub Pages, or other hosted deployment is used.
@@ -83,7 +83,7 @@ Then open:
 
 - local: `http://localhost:8080/fitness/`
 - Tailscale, after serve is configured:
-  `https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/`
+  `https://shakedm2.tail0b783.ts.net/fitness/`
 
 To run just the app server (no Caddy) — e.g. to curl the API directly:
 

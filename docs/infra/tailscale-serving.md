@@ -5,7 +5,7 @@
 
 ## Overview
 
-A single Tailscale node (`shakeds-macbook-pro-2.tail0b783.ts.net`) is the shared serving
+A single Tailscale node (`shakedm2.tail0b783.ts.net`) is the shared serving
 host for all local projects. Each project owns a **path prefix** under that host.
 The root path (`/`) is reserved for a future index page listing all served projects.
 
@@ -19,7 +19,7 @@ the public internet.
 Captured 2026-07-07:
 
 ```text
-https://shakeds-macbook-pro-2.tail0b783.ts.net (tailnet only)
+https://shakedm2.tail0b783.ts.net (tailnet only)
 |-- /fitness proxy http://127.0.0.1:8080/fitness
 ```
 
@@ -120,7 +120,7 @@ Follow the pattern in `site/bin/install-local-launchd.sh`. Set at minimum:
 ```bash
 tailscale serve status
 # confirm the new path appears under (tailnet only)
-curl -L https://shakeds-macbook-pro-2.tail0b783.ts.net/<project>/
+curl -L https://shakedm2.tail0b783.ts.net/<project>/
 ```
 
 ---
@@ -235,10 +235,10 @@ can actually observe it.
 
 ```bash
 # 1 — tailnet GET
-curl -s -o /dev/null -w "%{http_code}" https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/status
+curl -s -o /dev/null -w "%{http_code}" https://shakedm2.tail0b783.ts.net/fitness/api/status
 
 # 2 — tailnet POST as owner (header injected automatically by the proxy)
-curl -s -o /dev/null -w "%{http_code}" -X POST https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/api/log \
+curl -s -o /dev/null -w "%{http_code}" -X POST https://shakedm2.tail0b783.ts.net/fitness/api/log \
   -H "Content-Type: application/json" -d '{}'
 
 # 3 — loopback bypass (run on the laptop)

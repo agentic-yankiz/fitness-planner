@@ -8,7 +8,7 @@
 Keep the workout site available at:
 
 ```text
-https://shakeds-macbook-pro-2.tail0b783.ts.net/fitness/
+https://shakedm2.tail0b783.ts.net/fitness/
 ```
 
 The laptop should automatically pick up changes after they land on `main`, rebuild the
